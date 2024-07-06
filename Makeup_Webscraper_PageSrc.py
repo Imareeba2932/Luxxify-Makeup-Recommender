@@ -1,6 +1,6 @@
 
 import time
-
+from bs4 import BeautifulSoup
 
 
 from selenium import webdriver
@@ -39,7 +39,23 @@ myValue_total = ""
 
 # Optionally wait for the page to load completely
 WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, "//div[@class='ProductReviews__Reviews--containerList']")))
-    
+
 # Get the HTML content
 html_content = driver.page_source
-print(html_content) 
+
+#Prettify via BeautifulSoup
+
+soup = BeautifulSoup(html_content, 'html.parser')
+
+# Parse the HTML with BeautifulSoup
+soup = BeautifulSoup(html_content, 'html.parser')
+
+# Prettify the HTML
+pretty_html = soup.prettify()
+
+# Write the prettified HTML to a file
+with open('page_source.html', 'w', encoding='utf-8') as file:
+    file.write(pretty_html)
+
+print("HTML source has been written to 'page_source.html'")
+
