@@ -25,6 +25,8 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
 
+from Connection_Pool import ResourceManager
+
 
 # Determine number of CPUs
 num_cpus = multiprocessing.cpu_count()
@@ -41,6 +43,8 @@ options.add_argument('--headless')
 options.add_argument('--disable-gpu')
 options.add_argument('--no-sandbox')
 options.add_argument('--disable-dev-shm-usage')
+
+rm = ResourceManager(max_threads=16)
 
 
 
@@ -63,16 +67,9 @@ def get_category(link):
         product_links.extend(get_product_links(category_link, category_name))
 
     #Fierce parallelization
-    with ThreadPoolExecutor(max_workers=os.cpu_count() * 2) as executor:
+    with ThreadPoolExecutor(max_workers=rm.max_threads) as executor:
         futures = [executor.submit(get_product, link) for link in product_links]
         results = list(tqdm(as_completed(futures), total=len(product_links)))
-
-def get_driver():
-    # Install ChromeDriver if not found and create WebDriver instance
-    driver = webdriver.Chrome(service=Service(executable_path=chromedriver_path), options=options)
-    #driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options= options)
-    driver.maximize_window()
-    return driver
 
 def get_product(c):
     product_link_tag = c.find('a', class_='pal-c-Link pal-c-Link--primary pal-c-Link--default')
@@ -89,36 +86,36 @@ def get_product(c):
     return new_product
 
 def get_product_links(category_link, category_name):
-    driver = get_driver()
-    driver.get(category_link)
+    with rm.scoped_driver() as driver:
+        driver.get(category_link)
 
-    ##Gets and returns the link to the next page of products
-    def click_next_page():
-        try:
-            next_page_link = WebDriverWait(driver, 10).until(
-                EC.presence_of_element_located ((By.CLASS_NAME, 'ProductListingWrapper__LoadContent' ))
-            )
-            next_page_link = next_page_link.find_element(By.TAG_NAME, 'a')
-            next_page_href = next_page_link.get_attribute('href')
-            return next_page_href
-        except NoSuchElementException:
-            return False
+        ##Gets and returns the link to the next page of products
+        def click_next_page():
+            try:
+                next_page_link = WebDriverWait(driver, 10).until(
+                    EC.presence_of_element_located ((By.CLASS_NAME, 'ProductListingWrapper__LoadContent' ))
+                )
+                next_page_link = next_page_link.find_element(By.TAG_NAME, 'a')
+                next_page_href = next_page_link.get_attribute('href')
+                return next_page_href
+            except NoSuchElementException:
+                return False
 
-    def extract_links(): 
-        soup = BeautifulSoup(driver.page_source, "html.parser")
-        content = soup.find_all(class_='ProductCard')
-        return content
+        def extract_links(): 
+            soup = BeautifulSoup(driver.page_source, "html.parser")
+            content = soup.find_all(class_='ProductCard')
+            return content
 
-    all_content = extract_links() #gets the first page
+        all_content = extract_links() #gets the first page
 
-    #Handles pagination for the next pages of the category link
-    next_page = click_next_page()
-    while next_page: 
-        driver.get(next_page)
-        all_content.extend(extract_links())
+        #Handles pagination for the next pages of the category link
         next_page = click_next_page()
-    driver.quit()
-    return all_content
+        while next_page: 
+            driver.get(next_page)
+            all_content.extend(extract_links())
+            next_page = click_next_page()
+
+        return all_content
 
 
 
@@ -177,44 +174,43 @@ def get_spec_prod_details(product_link):
     return product_details
 
 def get_product_reviews(product_link):
-    driver = get_driver()
-    # Initialize the WebDriver
- 
-    driver.get(product_link)
-    reviews = {}
-    xhr_links = [] #stores the specific xhr links needed
-    reviews = []
+    with rm.scoped_driver() as driver:
+        # Initialize the WebDriver
     
-    # Function to extract the XHR URL
-    def extract_xhr_url():
-        for request in driver.requests: 
-            xhr_links.append(request.url)
-        return xhr_links
+        driver.get(product_link)
+        reviews = {}
+        xhr_links = [] #stores the specific xhr links needed
+        reviews = []
         
-    # Define a function to gradually scroll through the entire page
-    def slow_scroll(start_position):
-        scroll_height = driver.execute_script('return document.body.scrollHeight')
-        current_position = start_position
-        while current_position < scroll_height:
-            driver.execute_script('window.scrollTo(0, {});'.format(current_position))
-            current_position += 100  # Adjust scrolling speed by changing increment
-            time.sleep(0.2)  # Adjust sleep time to control scrolling speed
+        # Function to extract the XHR URL
+        def extract_xhr_url():
+            for request in driver.requests: 
+                xhr_links.append(request.url)
+            return xhr_links
+            
+        # Define a function to gradually scroll through the entire page
+        def slow_scroll(start_position):
+            scroll_height = driver.execute_script('return document.body.scrollHeight')
+            current_position = start_position
+            while current_position < scroll_height:
+                driver.execute_script('window.scrollTo(0, {});'.format(current_position))
+                current_position += 100  # Adjust scrolling speed by changing increment
+                time.sleep(0.2)  # Adjust sleep time to control scrolling speed
 
-    # Function to click the "Next" link
-    def click_next_review_page():
-        try:
-            next_page_link = WebDriverWait(driver, 20).until(
-                EC.element_to_be_clickable((By.CLASS_NAME, 'pr-rd-pagination-btn--next'))
-            )
+        # Function to click the "Next" link
+        def click_next_review_page():
             try:
-                next_page_link.click()
-            except ElementClickInterceptedException:
-                driver.execute_script("arguments[0].click();", next_page_link)
-            return True
-        except NoSuchElementException:
-            return False
+                next_page_link = WebDriverWait(driver, 20).until(
+                    EC.element_to_be_clickable((By.CLASS_NAME, 'pr-rd-pagination-btn--next'))
+                )
+                try:
+                    next_page_link.click()
+                except ElementClickInterceptedException:
+                    driver.execute_script("arguments[0].click();", next_page_link)
+                return True
+            except NoSuchElementException:
+                return False
 
-    try:
         # Wait for the section to be visible (adjust timeout as needed)
         section_id = "reviews"
         section_element = WebDriverWait(driver, 20).until(
@@ -231,17 +227,14 @@ def get_product_reviews(product_link):
             time.sleep(2)  # Wait for new content to load
             slow_scroll(height)
             extract_xhr_url()       
-    finally:
-        # Close the browser
-        driver.quit()
-    
-    #Adding Reviews to Product JSON
-    for x in xhr_links: 
-        if 'display.powerreviews.com' in x: 
-            r = requests.get(x)
-            soup = BeautifulSoup(r.content, "html.parser")   
-            reviews.append(soup.prettify())  
-    return reviews
+        
+        #Adding Reviews to Product JSON
+        for x in xhr_links: 
+            if 'display.powerreviews.com' in x: 
+                r = requests.get(x)
+                soup = BeautifulSoup(r.content, "html.parser")   
+                reviews.append(soup.prettify())  
+        return reviews
 
 
 url = 'https://www.ulta.com/shop/makeup/face'
