@@ -3,6 +3,7 @@ from bs4 import BeautifulSoup
 import html_to_json
 import json
 import os
+import atexit
 from contextlib import contextmanager
 from jsonpath_ng import jsonpath, parse
 from tqdm import tqdm
@@ -19,7 +20,6 @@ from psycopg2 import pool
 import time
 import threading
 import queue
-from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 import psycopg2
@@ -44,40 +44,34 @@ finally:
     ResourcePool.put_connection(conn)
 '''
 
-
-import queue
-import threading
-import psycopg2
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
-from webdriver_manager.chrome import ChromeDriverManager
-
 chrome_path = '/usr/bin/google-chrome'# Replace with your actual path
 chromedriver_path = '/usr/local/bin/chromedriver'  # Adjust as necessary
 
 class ResourceManager:
     _instance = None
+    _instance_lock = threading.Lock()
 
     def __new__(cls, *args, **kwargs):
-        if not cls._instance:
-            cls._instance = super().__new__(cls)
-            cls._instance.__initialized = False
+        with cls._instance_lock:
+            if not cls._instance:
+                cls._instance = super().__new__(cls)
+                cls._instance.__initialized = False
         return cls._instance
 
-    def __init__(self, max_threads=32):
+    def __init__(self, max_threads=16, max_connections=1):
         if self.__initialized:
             return
         self.__initialized = True
         self.max_threads = max_threads
         self.driver_queue = queue.Queue()
-        self.db_connection = None
         self.lock = threading.Lock()
-        self.create_resources()
+        atexit.register(self.cleanup)
+  
+   
 
-    def create_resources(self):
-        # Create database connection
-        self.db_connection = psycopg2.connect(
+        self.db_connection_pool = pool.ThreadedConnectionPool(
+            minconn=1,
+            maxconn= max_connections,
             database="makeup",
             user="zsarkar01",
             password="project",
@@ -85,6 +79,12 @@ class ResourceManager:
             port="5432",
             sslmode="disable"
         )
+
+
+
+        self.create_resources()
+
+    def create_resources(self):
 
         # Create WebDriver pool
         options = Options() #webdriver.ChromeOptions()
@@ -109,25 +109,32 @@ class ResourceManager:
     def release_driver(self, driver):
         with self.lock:
             self.driver_queue.put(driver)
+        
 
-    def execute_query(self, query):
+
+    def execute_query(self, query, values=None):
+        with self.get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(query, values)
+                conn.commit()
+    
+    @contextmanager
+    def get_connection(self):
+        conn = self.db_connection_pool.getconn()
         try:
-            with self.db_connection.cursor() as cursor:
-                cursor.execute(query)
-                self.db_connection.commit()
-        except Exception as e:
-            print(f"Error executing query: {e}")
+            yield conn
+        finally:
+            self.db_connection_pool.putconn(conn)
+
 
     def cleanup(self):
-        if self.db_connection:
-            self.db_connection.close()
-
-        while not self.driver_queue.empty():
-            driver = self.driver_queue.get()
-            driver.quit()
-
-    def __del__(self):
-        self.cleanup()
+        with self.lock:
+            while not self.driver_queue.empty():
+                driver = self.driver_queue.get()
+                driver.quit()
+    
+        self.db_connection_pool.closeall()
+        self.db_connection_pool = None
 
     @contextmanager
     def scoped_driver(self):
