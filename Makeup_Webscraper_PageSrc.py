@@ -1,3 +1,4 @@
+import psycopg2
 import requests
 from bs4 import BeautifulSoup
 import html_to_json
@@ -44,12 +45,13 @@ options.add_argument('--disable-gpu')
 options.add_argument('--no-sandbox')
 options.add_argument('--disable-dev-shm-usage')
 
-rm = ResourceManager(max_threads=16)
+THREADS = 16
+rm = ResourceManager(max_threads=THREADS)
 
 
 
-    
 def get_category(link):
+
     r = requests.get(link)
     soup = BeautifulSoup(r.content, "html.parser")
     content = soup.find_all(class_='CategoryCard')
@@ -64,25 +66,30 @@ def get_category(link):
         categories[category_name] = {}
         categories[category_name]['url'] = category_link
 
+
         product_links.extend(get_product_links(category_link, category_name))
 
     #Fierce parallelization
-    with ThreadPoolExecutor(max_workers=rm.max_threads) as executor:
+    with ThreadPoolExecutor(max_workers=THREADS) as executor:
         futures = [executor.submit(get_product, link) for link in product_links]
         results = list(tqdm(as_completed(futures), total=len(product_links)))
 
-def get_product(c):
-    product_link_tag = c.find('a', class_='pal-c-Link pal-c-Link--primary pal-c-Link--default')
-    product_link = product_link_tag.get('href')
+def get_product(product_link):
     new_product = {}
+
 
     new_product = get_product_details(product_link)
     #Next Set of Info to get: 
     product_details = get_spec_prod_details(product_link)
     new_product.update(product_details)
-
     reviews = get_product_reviews(product_link)
+
     new_product['reviews'] = reviews
+
+    query = "INSERT INTO json_data (data) VALUES (%s)"
+    values = (json.dumps(new_product, indent=4), )
+    
+    rm.execute_query(query, values)
     return new_product
 
 def get_product_links(category_link, category_name):
@@ -104,7 +111,11 @@ def get_product_links(category_link, category_name):
         def extract_links(): 
             soup = BeautifulSoup(driver.page_source, "html.parser")
             content = soup.find_all(class_='ProductCard')
-            return content
+            page_product_links = []
+            for c in content: 
+                product = c.find('a', class_='pal-c-Link pal-c-Link--primary pal-c-Link--default')
+                page_product_links.append(product.get('href'))
+            return page_product_links
 
         all_content = extract_links() #gets the first page
 
@@ -148,7 +159,6 @@ def get_product_details(product_link):
     #print(json.dumps(text_json, indent=4) )
     description = ' '.join(text_json)
     product['description'] = description
-    #print(product)
     return product
 
 #Adds specific product fields to json (name, id, price)
@@ -240,8 +250,40 @@ def get_product_reviews(product_link):
 url = 'https://www.ulta.com/shop/makeup/face'
 print(os.cpu_count())
 get_category(url)
+#link = 'https://www.ulta.com/p/double-wear-stay-in-place-foundation-xlsImpprod14641507?sku=2309420'
+
+#get_product(link)
 #links  = get_product_links('https://www.ulta.com/shop/makeup/face/foundation', 'foundation')
 #print(links)
 #reviews = get_product_reviews("https://www.ulta.com/p/double-wear-stay-in-place-foundation-xlsImpprod14641507?sku=2309420")
 #print(reviews)
- 
+
+    # Test database connection and insert JSON data
+'''
+conn = psycopg2.connect(
+    dbname="makeup",
+    user="zsarkar01",
+    password="project",
+    host="localhost",
+    port="5432",
+    sslmode="disable"
+)
+cursor = conn.cursor()
+query = 'CREATE TABLE IF NOT EXISTS json_data(id SERIAL PRIMARY KEY, data jsonb NOT NULL); ' 
+cursor.execute(query)
+#print(cursor.fetchall())
+# Sample JSON data to insert
+json_data = {"key": "value"}
+
+# SQL query to insert JSON data into json_data table
+insert_query ="""
+    INSERT INTO json_data (data)
+    VALUES (%s)
+    RETURNING id
+"""
+cursor.execute(insert_query, (json.dumps(json_data),))
+cursor.execute('Select * from json_data')
+print(cursor.fetchall())
+conn.commit()
+cursor.close()
+'''
