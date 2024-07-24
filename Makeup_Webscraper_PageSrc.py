@@ -45,9 +45,8 @@ options.add_argument('--disable-gpu')
 options.add_argument('--no-sandbox')
 options.add_argument('--disable-dev-shm-usage')
 
-THREADS = 16
+THREADS = 12
 rm = ResourceManager(max_threads=THREADS)
-
 
 
 def get_category(link):
@@ -55,19 +54,10 @@ def get_category(link):
     r = requests.get(link)
     soup = BeautifulSoup(r.content, "html.parser")
     content = soup.find_all(class_='CategoryCard')
-    categories = {}
     product_links = []
 
-    for c in content:
-        category_tag = c.find('a', class_='pal-c-Link pal-c-Link--primary pal-c-Link--default')
-        category_name = category_tag.get_text()
-        print('Starting Category {}'.format(category_name), flush=True)
-        category_link = category_tag.get('href')
-        categories[category_name] = {}
-        categories[category_name]['url'] = category_link
-
-
-        product_links.extend(get_product_links(category_link, category_name))
+    for category_soup in content:
+        product_links.extend(get_product_links(category_soup))
 
     #Fierce parallelization
     with ThreadPoolExecutor(max_workers=THREADS) as executor:
@@ -76,7 +66,6 @@ def get_category(link):
 
 def get_product(product_link):
     new_product = {}
-
 
     new_product = get_product_details(product_link)
     #Next Set of Info to get: 
@@ -90,43 +79,52 @@ def get_product(product_link):
     values = (json.dumps(new_product, indent=4), )
     
     rm.execute_query(query, values)
-    return new_product
 
-def get_product_links(category_link, category_name):
-    with rm.scoped_driver() as driver:
-        driver.get(category_link)
 
-        ##Gets and returns the link to the next page of products
-        def click_next_page():
-            try:
-                next_page_link = WebDriverWait(driver, 10).until(
-                    EC.presence_of_element_located ((By.CLASS_NAME, 'ProductListingWrapper__LoadContent' ))
-                )
-                next_page_link = next_page_link.find_element(By.TAG_NAME, 'a')
-                next_page_href = next_page_link.get_attribute('href')
-                return next_page_href
-            except NoSuchElementException:
-                return False
+def click_next_page(driver):
+    try:
+        next_page_link = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located ((By.CLASS_NAME, 'ProductListingWrapper__LoadContent' ))
+        )
+        next_page_link = next_page_link.find_element(By.TAG_NAME, 'a')
+        next_page_href = next_page_link.get_attribute('href')
+        return next_page_href
+    except NoSuchElementException:
+        return False
 
-        def extract_links(): 
-            soup = BeautifulSoup(driver.page_source, "html.parser")
-            content = soup.find_all(class_='ProductCard')
-            page_product_links = []
-            for c in content: 
-                product = c.find('a', class_='pal-c-Link pal-c-Link--primary pal-c-Link--default')
-                page_product_links.append(product.get('href'))
-            return page_product_links
+def extract_links(driver): 
+    soup = BeautifulSoup(driver.page_source, "html.parser")
+    content = soup.find_all(class_='ProductCard')
+    page_product_links = []
+    for c in content: 
+        product = c.find('a', class_='pal-c-Link pal-c-Link--primary pal-c-Link--default')
+        page_product_links.append(product.get('href'))
+    return page_product_links
 
-        all_content = extract_links() #gets the first page
-
-        #Handles pagination for the next pages of the category link
-        next_page = click_next_page()
-        while next_page: 
-            driver.get(next_page)
-            all_content.extend(extract_links())
-            next_page = click_next_page()
-
-        return all_content
+def get_product_links(category_soup):
+    category_tag = category_soup.find('a', class_='pal-c-Link pal-c-Link--primary pal-c-Link--default')
+    category_name = category_tag.get_text()
+    print(category_name)
+    category_link = category_tag.get('href')
+    all_content = []
+    pages = 0
+    next_page = category_link
+    while next_page: 
+        try: 
+            with rm.scoped_driver() as driver: 
+                driver.get(next_page)
+        
+                all_content.extend(extract_links(driver))
+                next_page = click_next_page(driver)
+                pages += 1
+                if pages % 10 == 0: 
+                    time.sleep(5)
+        except Exception as e:
+            print(e)
+            time.sleep(5)
+            continue
+ 
+    return all_content
 
 
 
