@@ -23,6 +23,7 @@ import queue
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 import psycopg2
+import gc
 
 '''
 # Create a cursor object
@@ -65,7 +66,9 @@ class ResourceManager:
         self.max_threads = max_threads
         self.driver_queue = queue.Queue()
         self.lock = threading.Lock()
-        atexit.register(self.cleanup)
+        gc.collect()
+        gc.disable()
+        #atexit.register(self.cleanup)
   
    
 
@@ -126,15 +129,22 @@ class ResourceManager:
         finally:
             self.db_connection_pool.putconn(conn)
 
+    def __del__(self):
+        """Destructor to clean up resources."""
+        self.cleanup()
+        gc.collect()
 
     def cleanup(self):
         with self.lock:
             while not self.driver_queue.empty():
                 driver = self.driver_queue.get()
                 driver.quit()
-    
-        self.db_connection_pool.closeall()
-        self.db_connection_pool = None
+                del driver
+            
+        if self.db_connection_pool:
+            self.db_connection_pool.closeall()
+            self.db_connection_pool = None
+            del self.db_connection_pool
 
     @contextmanager
     def scoped_driver(self):
