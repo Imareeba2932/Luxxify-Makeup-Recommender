@@ -4,7 +4,7 @@ import html_to_json
 import json
 import os
 import atexit
-from contextlib import contextmanager
+from contextlib import asynccontextmanager, contextmanager
 from jsonpath_ng import jsonpath, parse
 from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -24,6 +24,9 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 import psycopg2
 import gc
+import aiohttp
+import asyncio
+import asyncpg 
 
 '''
 # Create a cursor object
@@ -59,36 +62,28 @@ class ResourceManager:
                 cls._instance.__initialized = False
         return cls._instance
 
-    def __init__(self, max_threads=16, max_connections=1):
+    def __init__(self, max_threads=16):
         if self.__initialized:
             return
         self.__initialized = True
         self.max_threads = max_threads
         self.driver_queue = queue.Queue()
         self.lock = threading.Lock()
+        self.db_pool = None
+        self.loop = asyncio.get_event_loop()
+        self.loop.run_until_complete(self.create_resources())
+        atexit.register(self.cleanup)
         gc.collect()
         gc.disable()
-        #atexit.register(self.cleanup)
-  
    
+        #self.create_resources()
 
-        self.db_connection_pool = pool.ThreadedConnectionPool(
-            minconn=1,
-            maxconn= max_connections,
-            database="makeup",
-            user="zsarkar01",
-            password="project",
-            host="localhost",
-            port="5432",
-            sslmode="disable"
-        )
+    async def create_resources(self):
+        await self.create_db_pool()
+        self.create_driver_pool()
 
 
-
-        self.create_resources()
-
-    def create_resources(self):
-
+    def create_driver_pool(self): 
         # Create WebDriver pool
         options = Options() #webdriver.ChromeOptions()
         options.binary_location = chrome_path
@@ -105,6 +100,26 @@ class ResourceManager:
             driver.maximize_window()
             self.driver_queue.put(driver)
 
+    
+    async def create_db_pool(self):
+        self.db_pool = await asyncpg.create_pool(
+            database="makeup",
+            user="zsarkar01",
+            password="project",
+            host="localhost",
+            port="5432"
+        )
+    
+    @asynccontextmanager
+    async def get_connection(self):
+        async with self.db_pool.acquire() as conn:
+            yield conn
+        
+    async def execute_query(self, query, *values):
+        async with self.get_connection() as conn:
+            await conn.execute(query, *values)
+
+
     def get_driver(self):
         with self.lock:
             return self.driver_queue.get()
@@ -113,21 +128,6 @@ class ResourceManager:
         with self.lock:
             self.driver_queue.put(driver)
         
-
-
-    def execute_query(self, query, values=None):
-        with self.get_connection() as conn:
-            with conn.cursor() as cursor:
-                cursor.execute(query, values)
-                conn.commit()
-    
-    @contextmanager
-    def get_connection(self):
-        conn = self.db_connection_pool.getconn()
-        try:
-            yield conn
-        finally:
-            self.db_connection_pool.putconn(conn)
 
     def __del__(self):
         """Destructor to clean up resources."""
@@ -140,11 +140,10 @@ class ResourceManager:
                 driver = self.driver_queue.get()
                 driver.quit()
                 del driver
-            
-        if self.db_connection_pool:
-            self.db_connection_pool.closeall()
-            self.db_connection_pool = None
-            del self.db_connection_pool
+        if self.db_pool:
+            self.loop.run_until_complete(self.db_pool.close())
+            self.db_pool = None
+        gc.collect()
 
     @contextmanager
     def scoped_driver(self):
