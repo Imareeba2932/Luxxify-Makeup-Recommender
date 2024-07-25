@@ -10,6 +10,9 @@ from multiprocessing import Pool, cpu_count
 from concurrent.futures import ThreadPoolExecutor, as_completed, ProcessPoolExecutor
 import sys
 import multiprocessing
+import aiohttp
+import asyncio
+
 
 
 from webdriver_manager.chrome import ChromeDriverManager
@@ -25,15 +28,22 @@ from selenium.common.exceptions import NoSuchElementException, ElementClickInter
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
+from selenium.common.exceptions import StaleElementReferenceException
+from tqdm.asyncio import tqdm  # Import tqdm for async
+import logging
+
 
 from Connection_Pool import ResourceManager
 
+MAX_CONCURRENT_REQUESTS = 16
+semaphore = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
 
 # Determine number of CPUs
 num_cpus = multiprocessing.cpu_count()
 
 chrome_path = '/usr/bin/google-chrome'# Replace with your actual path
 chromedriver_path = '/usr/local/bin/chromedriver'  # Adjust as necessary
+#logging.basicConfig(level=logging.INFO)
 
 
 options = Options() #webdriver.ChromeOptions()
@@ -45,43 +55,47 @@ options.add_argument('--disable-gpu')
 options.add_argument('--no-sandbox')
 options.add_argument('--disable-dev-shm-usage')
 
-THREADS = 12
+THREADS = MAX_CONCURRENT_REQUESTS
 rm = ResourceManager(max_threads=THREADS)
+n= 0
 
 
-def get_category(link):
-
-    r = requests.get(link)
-    soup = BeautifulSoup(r.content, "html.parser")
-    content = soup.find_all(class_='CategoryCard')
+async def get_category(link):
     product_links = []
+    async with aiohttp.ClientSession() as session:
+        async with session.get(link) as response:
 
-    for category_soup in content:
-        product_links.extend(get_product_links(category_soup))
+            soup = BeautifulSoup(await response.text(), "html.parser")
+            content = soup.find_all(class_='CategoryCard')
+            
 
-    #Fierce parallelization
-    with ThreadPoolExecutor(max_workers=THREADS) as executor:
-        futures = [executor.submit(get_product, link) for link in product_links]
-        results = list(tqdm(as_completed(futures), total=len(product_links)))
+            for category_soup in content:
+                product_links.extend(await get_product_links(category_soup))
 
-def get_product(product_link):
-    new_product = {}
+ 
+  
+            tasks = [get_product(link) for link in product_links]
+            results = await asyncio.gather(*tasks)
+            #return results
 
-    new_product = get_product_details(product_link)
-    #Next Set of Info to get: 
-    product_details = get_spec_prod_details(product_link)
-    new_product.update(product_details)
-    reviews = get_product_reviews(product_link)
+async def get_product(product_link):
+    async with semaphore:
+        new_product = await get_product_details(product_link)
+        #print('got product description')
+        product_details = await get_spec_prod_details(product_link)
+        #print('got specific product details')
+        new_product.update(product_details)
+        reviews = await get_product_reviews(product_link)
+        new_product['reviews'] = reviews
 
-    new_product['reviews'] = reviews
+        query = "INSERT INTO json_data (data) VALUES (%s)"
+        values = (json.dumps(new_product, indent=4), )
+        
+        await rm.execute_query(query, *values)
+        print("got product")
 
-    query = "INSERT INTO json_data (data) VALUES (%s)"
-    values = (json.dumps(new_product, indent=4), )
-    
-    rm.execute_query(query, values)
 
-
-def click_next_page(driver):
+async def click_next_page(driver):
     try:
         next_page_link = WebDriverWait(driver, 10).until(
             EC.presence_of_element_located ((By.CLASS_NAME, 'ProductListingWrapper__LoadContent' ))
@@ -92,7 +106,7 @@ def click_next_page(driver):
     except NoSuchElementException:
         return False
 
-def extract_links(driver): 
+async def extract_links(driver): 
     soup = BeautifulSoup(driver.page_source, "html.parser")
     content = soup.find_all(class_='ProductCard')
     page_product_links = []
@@ -101,7 +115,7 @@ def extract_links(driver):
         page_product_links.append(product.get('href'))
     return page_product_links
 
-def get_product_links(category_soup):
+async def get_product_links(category_soup):
     category_tag = category_soup.find('a', class_='pal-c-Link pal-c-Link--primary pal-c-Link--default')
     category_name = category_tag.get_text()
     print(category_name)
@@ -114,11 +128,14 @@ def get_product_links(category_soup):
             with rm.scoped_driver() as driver: 
                 driver.get(next_page)
         
-                all_content.extend(extract_links(driver))
-                next_page = click_next_page(driver)
+                all_content.extend(await extract_links(driver))
+                next_page = await click_next_page(driver)
                 pages += 1
                 if pages % 10 == 0: 
                     time.sleep(5)
+        except StaleElementReferenceException as e:
+            time.sleep(5)
+            continue
         except Exception as e:
             print(e)
             time.sleep(5)
@@ -129,26 +146,27 @@ def get_product_links(category_soup):
 
 
 # Returns info such as ingredrients and product description
-def get_product_details(product_link):
-    r = requests.get(product_link)
-    soup = BeautifulSoup(r.content, "html.parser")
-    html_content = soup.find_all(class_='ProductHero__content')
-    description = ''
-    product = {}
-    product['url'] = product_link
+async def get_product_details(product_link):
+    async with aiohttp.ClientSession() as session:
+        async with session.get(product_link) as response:
+            soup = BeautifulSoup(await response.text(), "html.parser")
+            html_content = soup.find_all(class_='ProductHero__content')
+            description = ''
+            product = {}
+            product['url'] = product_link
     
-    def extract_text_fields(json_data):
-        jsonpath_expression = parse('$.._value')
-        matches = jsonpath_expression.find(json_data)
-        return [match.value for match in matches]
+            def extract_text_fields(json_data):
+                jsonpath_expression = parse('$.._value')
+                matches = jsonpath_expression.find(json_data)
+                return [match.value for match in matches]
 
-    
-    def html_to_text_json(html_content):
-        """Convert HTML content to a nested JSON containing only text fields."""
-        json_data = html_to_json.convert(html_content)
-        text_fields = extract_text_fields(json_data)
-        #print(json.dumps(json_data, indent=4))
-        return text_fields
+            
+            def html_to_text_json(html_content):
+                """Convert HTML content to a nested JSON containing only text fields."""
+                json_data = html_to_json.convert(html_content)
+                text_fields = extract_text_fields(json_data)
+                #print(json.dumps(json_data, indent=4))
+                return text_fields
 
     # Convert HTML to text-only JSON
     text_json = html_to_text_json(str(html_content))
@@ -159,29 +177,40 @@ def get_product_details(product_link):
     product['description'] = description
     return product
 
+
+#<span class="Text-ds Text-ds--title-5 Text-ds--left Text-ds--black">Double Wear Stay-in-Place Foundation</span>
+
 #Adds specific product fields to json (name, id, price)
-def get_spec_prod_details(product_link): 
-    r = requests.get(product_link)
-    soup = BeautifulSoup(r.content, "html.parser")
-    content = soup.find(class_='ProductHero__content')
-    product_details = {}
+async def get_spec_prod_details(product_link):
+    async with aiohttp.ClientSession() as session:
+        async with session.get(product_link) as response:
+            response.raise_for_status()
+            soup = BeautifulSoup(await response.text(), "html.parser")
+            price = soup.find_all(class_='ProductPricing')
+            name = soup.find_all(class_='Text-ds Text-ds--title-5 Text-ds--left Text-ds--black')
+            id_num  = soup.find_all(class_ = 'Text-ds Text-ds--body-3 Text-ds--left Text-ds--neutral-600')
 
-    #c = content[0]
-    name = content.find(class_= 'Text-ds Text-ds--body-1 Text-ds--left Text-ds--black')
-    price = content.find(class_='ProductPricing')
-    id_num = content.find(class_='Text-ds Text-ds--body-3 Text-ds--left Text-ds--neutral-600')
+            product_details = {}
+            product_price = "NA"
+            product_name = "NA"
+            if len(price) > 0:
+                product_price = price[0].get_text()
+            if len(name) > 0:
+                product_name = name[0].get_text()
 
-    product_price = price.get_text()
-    product_name = name.get_text()
-    product_id = id_num.get_text()
+            for id_content in id_num:
+                line = id_content.find(class_='Text-ds Text-ds--body-3 Text-ds--left Text-ds--black')
+                if line is not None:
+                    product_id = line.get_text()
+                    break
 
-    product_details['price'] = product_price
-    product_details['id'] = product_id
-    product_details['name'] = product_name
+            product_details['price'] = product_price
+            product_details['id'] = product_id
+            product_details['name'] = product_name
 
     return product_details
 
-def get_product_reviews(product_link):
+async def get_product_reviews(product_link):
     with rm.scoped_driver() as driver:
         # Initialize the WebDriver
     
@@ -237,51 +266,22 @@ def get_product_reviews(product_link):
             extract_xhr_url()       
         
         #Adding Reviews to Product JSON
-        for x in xhr_links: 
-            if 'display.powerreviews.com' in x: 
-                r = requests.get(x)
-                soup = BeautifulSoup(r.content, "html.parser")   
-                reviews.append(soup.prettify())  
+        for x in xhr_links:
+            if 'display.powerreviews.com' in x:
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(x) as response:
+                        soup = BeautifulSoup(await response.text(), "html.parser")
+                        reviews.append(soup.prettify()) 
         return reviews
 
 
-url = 'https://www.ulta.com/shop/makeup/face'
-print(os.cpu_count())
-get_category(url)
-#link = 'https://www.ulta.com/p/double-wear-stay-in-place-foundation-xlsImpprod14641507?sku=2309420'
 
-#get_product(link)
-#links  = get_product_links('https://www.ulta.com/shop/makeup/face/foundation', 'foundation')
-#print(links)
-#reviews = get_product_reviews("https://www.ulta.com/p/double-wear-stay-in-place-foundation-xlsImpprod14641507?sku=2309420")
-#print(reviews)
 
-    # Test database connection and insert JSON data
-'''
-conn = psycopg2.connect(
-    dbname="makeup",
-    user="zsarkar01",
-    password="project",
-    host="localhost",
-    port="5432",
-    sslmode="disable"
-)
-cursor = conn.cursor()
-query = 'CREATE TABLE IF NOT EXISTS json_data(id SERIAL PRIMARY KEY, data jsonb NOT NULL); ' 
-cursor.execute(query)
-#print(cursor.fetchall())
-# Sample JSON data to insert
-json_data = {"key": "value"}
+async def main():
+    url = 'https://www.ulta.com/shop/makeup/face'
+    await get_category(url)
+    #url = 'https://www.ulta.com/p/double-wear-stay-in-place-foundation-xlsImpprod14641507?sku=2309420'
+    #await get_product(url)
 
-# SQL query to insert JSON data into json_data table
-insert_query ="""
-    INSERT INTO json_data (data)
-    VALUES (%s)
-    RETURNING id
-"""
-cursor.execute(insert_query, (json.dumps(json_data),))
-cursor.execute('Select * from json_data')
-print(cursor.fetchall())
-conn.commit()
-cursor.close()
-'''
+if __name__ == "__main__":
+    asyncio.run(main())
