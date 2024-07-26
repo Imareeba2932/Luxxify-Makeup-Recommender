@@ -35,7 +35,7 @@ import logging
 
 from Connection_Pool import ResourceManager
 
-MAX_CONCURRENT_REQUESTS = 16
+MAX_CONCURRENT_REQUESTS = 4
 semaphore = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
 
 # Determine number of CPUs
@@ -55,8 +55,7 @@ options.add_argument('--disable-gpu')
 options.add_argument('--no-sandbox')
 options.add_argument('--disable-dev-shm-usage')
 
-THREADS = MAX_CONCURRENT_REQUESTS
-rm = ResourceManager(max_threads=THREADS)
+rm = ResourceManager(max_threads=MAX_CONCURRENT_REQUESTS)
 n= 0
 
 
@@ -64,13 +63,12 @@ async def get_category(link):
     product_links = []
     async with aiohttp.ClientSession() as session:
         async with session.get(link) as response:
-
             soup = BeautifulSoup(await response.text(), "html.parser")
             content = soup.find_all(class_='CategoryCard')
             
 
             for category_soup in content:
-                product_links.extend(await get_product_links(category_soup))
+                product_links.extend(get_product_links(category_soup))
 
  
   
@@ -79,23 +77,23 @@ async def get_category(link):
             #return results
 
 async def get_product(product_link):
-    async with semaphore:
-        new_product = await get_product_details(product_link)
-        #print('got product description')
-        product_details = await get_spec_prod_details(product_link)
-        #print('got specific product details')
-        new_product.update(product_details)
-        reviews = await get_product_reviews(product_link)
-        new_product['reviews'] = reviews
+    #async with semaphore:
+    new_product = await get_product_details(product_link)
+    #print('got product description')
+    product_details = await get_spec_prod_details(product_link)
+    #print('got specific product details')
+    new_product.update(product_details)
+    reviews = await get_product_reviews(product_link)
+    new_product['reviews'] = reviews
 
-        query = "INSERT INTO json_data (data) VALUES (%s)"
-        values = (json.dumps(new_product, indent=4), )
-        
-        await rm.execute_query(query, *values)
-        print("got product")
+    query = "INSERT INTO json_data (data) VALUES (%s)"
+    values = (json.dumps(new_product, indent=4), )
+    
+    await rm.execute_query(query, *values)
+    print(new_product['name'], new_product['price'])
 
 
-async def click_next_page(driver):
+def click_next_page(driver):
     try:
         next_page_link = WebDriverWait(driver, 10).until(
             EC.presence_of_element_located ((By.CLASS_NAME, 'ProductListingWrapper__LoadContent' ))
@@ -103,43 +101,48 @@ async def click_next_page(driver):
         next_page_link = next_page_link.find_element(By.TAG_NAME, 'a')
         next_page_href = next_page_link.get_attribute('href')
         return next_page_href
-    except NoSuchElementException:
+    except Exception:
         return False
 
-async def extract_links(driver): 
+def extract_links(driver): 
     soup = BeautifulSoup(driver.page_source, "html.parser")
     content = soup.find_all(class_='ProductCard')
     page_product_links = []
-    for c in content: 
+    for c in content:
         product = c.find('a', class_='pal-c-Link pal-c-Link--primary pal-c-Link--default')
         page_product_links.append(product.get('href'))
     return page_product_links
 
-async def get_product_links(category_soup):
-    category_tag = category_soup.find('a', class_='pal-c-Link pal-c-Link--primary pal-c-Link--default')
+def get_product_links(category_soup):
+    print('get_product_links')
+    time.sleep(2)
+    category_tag = category_soup.find('a', class_="pal-c-Link pal-c-Link--primary pal-c-Link--default")
+    
     category_name = category_tag.get_text()
-    print(category_name)
     category_link = category_tag.get('href')
+
+    print(category_name, category_link)
     all_content = []
     pages = 0
     next_page = category_link
-    while next_page: 
-        try: 
-            with rm.scoped_driver() as driver: 
-                driver.get(next_page)
-        
-                all_content.extend(await extract_links(driver))
-                next_page = await click_next_page(driver)
+    with rm.scoped_driver() as driver: 
+        while next_page:
+            try: 
                 pages += 1
+                driver.get(next_page)
+                all_content.extend(extract_links(driver))
+                next_page = click_next_page(driver)
+                print('next_page',next_page,flush=True)
                 if pages % 10 == 0: 
                     time.sleep(5)
-        except StaleElementReferenceException as e:
-            time.sleep(5)
-            continue
-        except Exception as e:
-            print(e)
-            time.sleep(5)
-            continue
+            except StaleElementReferenceException as e:
+                time.sleep(5)
+                print('stale element',flush=True)
+                continue
+            except Exception as e:
+                print(e)
+                time.sleep(5)
+                continue
  
     return all_content
 
@@ -184,7 +187,7 @@ async def get_product_details(product_link):
 async def get_spec_prod_details(product_link):
     async with aiohttp.ClientSession() as session:
         async with session.get(product_link) as response:
-            response.raise_for_status()
+            #response.raise_for_status()
             soup = BeautifulSoup(await response.text(), "html.parser")
             price = soup.find_all(class_='ProductPricing')
             name = soup.find_all(class_='Text-ds Text-ds--title-5 Text-ds--left Text-ds--black')
@@ -193,6 +196,7 @@ async def get_spec_prod_details(product_link):
             product_details = {}
             product_price = "NA"
             product_name = "NA"
+            product_id = "NA"
             if len(price) > 0:
                 product_price = price[0].get_text()
             if len(name) > 0:
@@ -250,12 +254,12 @@ async def get_product_reviews(product_link):
 
         # Wait for the section to be visible (adjust timeout as needed)
         section_id = "reviews"
+        slow_scroll(height)
         section_element = WebDriverWait(driver, 20).until(
             EC.visibility_of_element_located((By.ID, section_id))
         )
         height = section_element.location['y']
         time.sleep(2)
-        slow_scroll(height)
         extract_xhr_url()
 
         pg_count = 1
@@ -280,8 +284,8 @@ async def get_product_reviews(product_link):
 async def main():
     url = 'https://www.ulta.com/shop/makeup/face'
     await get_category(url)
-    #url = 'https://www.ulta.com/p/double-wear-stay-in-place-foundation-xlsImpprod14641507?sku=2309420'
-    #await get_product(url)
+    #url = 'https://www.ulta.com/shop/makeup/face/bb-cc-creams'
+    #await get_product_links(url)
 
 if __name__ == "__main__":
     asyncio.run(main())

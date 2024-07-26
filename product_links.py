@@ -59,6 +59,7 @@ rm = ResourceManager(max_threads=MAX_CONCURRENT_REQUESTS)
 n= 0
 
 async def get_category(link):
+    print('get_category')
     product_links = []
     async with aiohttp.ClientSession() as session:
         async with session.get(link) as response:
@@ -66,21 +67,31 @@ async def get_category(link):
             content = soup.find_all(class_='CategoryCard')
             
 
-            for category_soup in content:
-                product_link = get_product_links(category_soup)
-                #product_links.extend(product_link)
+            #for category_soup in content:
+                #product_link = get_product_links(category_soup)
+                #print(product_links)
 
+            # Create a list of tasks for get_product_links
+            tasks = [get_product_links(category_soup) for category_soup in content]
 
-  
-            #tasks = [get_product(link) for link in product_links]
-            #results = await asyncio.gather(*tasks)
-            #return results
+            # Gather results from all tasks
+            product_links_from_categories = await asyncio.gather(*tasks)
 
-async def insert_table(product_link):
+            for product_link in product_links_from_categories:
+                product_links.extend(product_link)
+                
+                
+    for link in product_links:
+        insert_table(link)
+            #return product_links
 
-    query = "INSERT INTO product_links (data) VALUES ($1)"
-    values = (product_link, ) 
-    await rm.execute_query(query, *values)
+def insert_table(product_link):
+    query = "INSERT INTO product_links (product_link) VALUES (%s)"
+    values = (product_link, )
+    rm.execute_query(query, values)
+ 
+    print(f'Inserted link: {product_link}')
+ 
 
 
 def click_next_page(driver):
@@ -101,34 +112,36 @@ def extract_links(driver):
     for c in content:
         product = c.find('a', class_='pal-c-Link pal-c-Link--primary pal-c-Link--default')
         link = product.get('href')
-        insert_table(link)
-        print('inserted into table: ', link)
         page_product_links.append(link)
     return page_product_links
 
-def get_product_links(category_soup):
-    print('get_product_links')
-    time.sleep(2)
+async def get_product_links(category_soup):
+    await asyncio.sleep(2) 
+    
     category_tag = category_soup.find('a', class_="pal-c-Link pal-c-Link--primary pal-c-Link--default")
     
     category_name = category_tag.get_text()
     category_link = category_tag.get('href')
+    print(category_name)
 
     all_content = []
     pages = 0
     next_page = category_link
-    with rm.scoped_driver() as driver: 
+    print('next_page variable', next_page)
+    async with rm.async_scoped_driver() as driver:
+        
+        print('within driver', flush=True)
         while next_page:
             try: 
                 pages += 1
                 driver.get(next_page)
                 all_content.extend(extract_links(driver))
                 next_page = click_next_page(driver)
-                print('next_page',next_page,flush=True)
+                #print('next_page',next_page,flush=True)
                 if pages % 10 == 0: 
-                    time.sleep(5)
+                    await asyncio.sleep(5)  
             except StaleElementReferenceException as e:
-                time.sleep(5)
+                await asyncio.sleep(5) 
                 print('stale element',flush=True)
                 continue
             except Exception as e:
@@ -138,11 +151,10 @@ def get_product_links(category_soup):
  
     return all_content
 
-async def main():
-    url = 'https://www.ulta.com/shop/makeup/face'
-    await get_category(url)
+url = 'https://www.ulta.com/shop/makeup/face'
+asyncio.run(get_category(url))
+    #await insert_table(all_links)
     #url = 'https://www.ulta.com/shop/makeup/face/bb-cc-creams'
     #await get_product_links(url)
 
-if __name__ == "__main__":
-    asyncio.run(main())
+    

@@ -28,6 +28,14 @@ import aiohttp
 import asyncio
 import asyncpg 
 
+
+from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
+
+# Increase page load timeout
+#caps = DesiredCapabilities().CHROME
+#caps["pageLoadStrategy"] = "none"
+
+
 '''
 # Create a cursor object
 cursor = conn.cursor()
@@ -67,19 +75,15 @@ class ResourceManager:
             return
         self.__initialized = True
         self.max_threads = max_threads
-        self.driver_queue = queue.Queue()
-        self.lock = threading.Lock()
+        self.driver_queue =  asyncio.Queue()
+        self.lock = asyncio.Semaphore(1)
         self.db_pool = None
-        self.loop = asyncio.get_event_loop()
-        self.loop.run_until_complete(self.create_resources())
-        atexit.register(self.cleanup)
-        gc.collect()
-        gc.disable()
-   
-        #self.create_resources()
+        # Run asynchronous initialization
+        self.create_resources()
+        atexit.register(self._cleanup_wrapper)
 
-    async def create_resources(self):
-        await self.create_db_pool()
+    def create_resources(self):
+        self.create_db_pool()
         self.create_driver_pool()
 
 
@@ -93,23 +97,29 @@ class ResourceManager:
         options.add_argument('--disable-gpu')
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
+        options.add_argument("--disable-extensions")  # Disable extensions
+        #options.add_argument("--disable-popup-blocking")  # Disable popups
+        #options.add_argument("--disable-images")  # Disable images
 
         service = Service(executable_path=chromedriver_path)
         for _ in range(self.max_threads):
             driver = webdriver.Chrome(service=service, options=options)
             driver.maximize_window()
-            self.driver_queue.put(driver)
-
+            asyncio.run(self.driver_queue.put(driver))
+            
+    '''
     
-    async def create_db_pool(self):
-        self.db_pool = await asyncpg.create_pool(
-            database="makeup",
-            user="zsarkar01",
-            password="project",
-            host="localhost",
-            port="5432"
-        )
-    
+        def create_db_pool(self):
+            self.db_pool = asyncpg.create_pool(
+                database="makeup",
+                user="zsarkar01",
+                password="project",
+                host="localhost",
+                port="5432",
+                sslmode="disable"  # Disable SSL
+            ) 
+    '''
+    '''
     @asynccontextmanager
     async def get_connection(self):
         async with self.db_pool.acquire() as conn:
@@ -118,30 +128,66 @@ class ResourceManager:
     async def execute_query(self, query, *values):
         async with self.get_connection() as conn:
             await conn.execute(query, *values)
+    '''
+    
+
+    def create_db_pool(self):
+        self.db_pool = psycopg2.pool.SimpleConnectionPool(
+            minconn=1,
+            maxconn=10,
+            database="makeup",
+            user="zsarkar01",
+            password="project",
+            host="localhost",
+            port="5432",
+            sslmode="disable"  # Disable SSL
+        )
+        if not self.db_pool:
+            raise Exception("Unable to create connection pool")
 
 
-    def get_driver(self):
-        with self.lock:
-            return self.driver_queue.get()
+    @contextmanager
+    def get_connection(self):
+        #with self.lock: 
+        try:
+            conn = self.db_pool.getconn()
+            yield conn
+        finally:
+            #with self.lock:  # Release the lock before putting the connection back
+            self.db_pool.putconn(conn)
 
-    def release_driver(self, driver):
-        with self.lock:
-            self.driver_queue.put(driver)
         
+    def execute_query(self, query, *values):
+        with self.get_connection() as conn:  # Get a connection from the pool
+            with conn.cursor() as cursor:  # Create a cursor
+                cursor.execute(query, *values)  # Execute the query
+                conn.commit()  # Commit if needed
 
+
+    async def get_driver(self):
+        driver = await self.driver_queue.get()
+        #driver.command_executor.set_timeout(10)
+        return driver
+
+    async def release_driver(self, driver):
+        self.driver_queue.put_nowait(driver)
+        
+    
     def __del__(self):
         """Destructor to clean up resources."""
-        self.cleanup()
+        asyncio.run(self.cleanup())
         gc.collect()
+   
+    def _cleanup_wrapper(self):
+        # Run the async cleanup function in a synchronous context
+        asyncio.run(self.cleanup())
 
-    def cleanup(self):
-        with self.lock:
-            while not self.driver_queue.empty():
-                driver = self.driver_queue.get()
-                driver.quit()
-                del driver
+    async def cleanup(self):
+        while not self.driver_queue.empty():
+            driver = await self.driver_queue.get()
+            driver.quit()
+            del driver
         if self.db_pool:
-            self.loop.run_until_complete(self.db_pool.close())
             self.db_pool = None
         gc.collect()
 
@@ -152,3 +198,11 @@ class ResourceManager:
             yield driver
         finally:
             self.release_driver(driver)
+        
+    @asynccontextmanager
+    async def async_scoped_driver(self):
+        driver = await self.get_driver()
+        try:
+            yield driver
+        finally:
+            await self.release_driver(driver)
