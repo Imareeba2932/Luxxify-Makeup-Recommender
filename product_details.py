@@ -37,7 +37,21 @@ MAX_CONCURRENT_REQUESTS = 4
 semaphore = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
 
 rm = ResourceManager(max_threads=MAX_CONCURRENT_REQUESTS)
-product_details = {}
+
+
+
+
+
+def insert_table(product_details, product_id):
+    query = """
+    INSERT INTO product_details (details, product_link_id) 
+    VALUES (%s, %s);
+    """
+
+    values = (json.dumps(product_details), product_id)
+    rm.execute_query(query, values)
+ 
+    print(f'Inserted link: {product_details['name']}')
 
 def get_product_links():
     # Write your query
@@ -52,6 +66,7 @@ def get_product_links():
 
 # Returns info such as ingredrients and product description
 async def get_product_details(product_link):
+    product_details = {}
     async with aiohttp.ClientSession() as session:
         async with session.get(product_link) as response:
             soup = BeautifulSoup(await response.text(), "html.parser")
@@ -79,29 +94,36 @@ async def get_product_details(product_link):
     #print(json.dumps(text_json, indent=4) )
     description = ' '.join(text_json)
     product_details['description'] = description
-    print(product_details)
+    #print(product_details)
+    await get_spec_prod_details(product_link, product_details)
+    return product_details
 
 
 
-#<span class="Text-ds Text-ds--title-5 Text-ds--left Text-ds--black">Double Wear Stay-in-Place Foundation</span>
+#<a class="pal-c-Link pal-c-Link--primary pal-c-Link--compact" href="https://www.ulta.com/brand/it-cosmetics" target="_self" iconsize="default">IT Cosmetics</a>
 
 #Adds specific product fields to json (name, id, price)
-async def get_spec_prod_details(product_link):
+async def get_spec_prod_details(product_link, product_details):
     async with aiohttp.ClientSession() as session:
         async with session.get(product_link) as response:
             #response.raise_for_status()
             soup = BeautifulSoup(await response.text(), "html.parser")
             price = soup.find_all(class_='ProductPricing')
+            brand = soup.find_all(class_='pal-c-Link pal-c-Link--primary pal-c-Link--compact')
             name = soup.find_all(class_='Text-ds Text-ds--title-5 Text-ds--left Text-ds--black')
             id_num  = soup.find_all(class_ = 'Text-ds Text-ds--body-3 Text-ds--left Text-ds--neutral-600')
 
             product_price = "NA"
             product_name = "NA"
             product_id = "NA"
+            product_brand = 'NA'
+            
             if len(price) > 0:
                 product_price = price[0].get_text()
             if len(name) > 0:
                 product_name = name[0].get_text()
+            if len(brand) > 8: 
+                product_brand = brand[8].get_text()
 
             for id_content in id_num:
                 line = id_content.find(class_='Text-ds Text-ds--body-3 Text-ds--left Text-ds--black')
@@ -111,22 +133,26 @@ async def get_spec_prod_details(product_link):
 
             product_details['price'] = product_price
             product_details['id'] = product_id
+            product_details['brand'] = product_brand
             product_details['name'] = product_name
-            print(product_details)
-
-url = 'https://www.ulta.com/p/cc-cream-with-spf-50-xlsImpprod5770257?sku=2264064'
+            #print(product_details)
+'''
+url = 'https://www.ulta.com/p/double-wear-stay-in-place-foundation-xlsImpprod14641507?sku=2309420'
 asyncio.run( get_spec_prod_details(url) )
-asyncio.run( get_product_details(url) )
+#asyncio.run( get_product_details(url) )
+'''
 
 # Store results in a variable
-'''
+
 results = get_product_links()
 results_as_list = [list(row) for row in results]
 
+
 # Convert to a list of lists if needed
-for i in range(10): 
-    url = results_as_list[i][-1]
-    asyncio.run( get_spec_prod_details(url) )
-    asyncio.run( get_product_details(url) )
-'''
+for row in tqdm(results_as_list): 
+    url = row[-1]
+    id = row[0]
+    product_details = asyncio.run(get_product_details(url) )
+    insert_table(product_details, id)
+
  

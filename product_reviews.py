@@ -34,8 +34,8 @@ import asyncio
 
 from Connection_Pool import ResourceManager
 
-MAX_CONCURRENT_REQUESTS = 4
-semaphore = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
+MAX_CONCURRENT_REQUESTS = 8
+#semaphore = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
 
 # Determine number of CPUs
 num_cpus = multiprocessing.cpu_count()
@@ -66,8 +66,59 @@ def get_product_links():
             cursor.execute(query)
             rows = cursor.fetchall()
             return rows
-    
 
+async def get_product_reviews(product_link, product_link_id):
+    async with rm.async_scoped_driver() as driver:
+        reviews = []
+        next_url = None
+        try:
+            driver.get(product_link)
+        except Exception as e:
+            print(e)
+            return (None, product_link_id, next_url)
+        print("Starting")
+        # Wait for the section to be visible (adjust timeout as needed)
+        section_id = "reviews"
+        loop = asyncio.get_event_loop()
+        section_element = await loop.run_in_executor(None, lambda: WebDriverWait(driver, 20).until(
+            EC.visibility_of_element_located((By.ID, section_id))
+        ))
+        height = section_element.location['y']
+        await slow_scroll(driver, height)
+        time.sleep(2)
+        xhr_links = await extract_xhr_url(driver) #get first page
+        print("XHR")
+        #Adding Reviews to Product JSON
+        for x in xhr_links:
+            if 'display.powerreviews.com' in x:
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(x) as response:
+                        soup = BeautifulSoup(await response.text(), "html.parser")
+                        reviews.append(soup.prettify())
+        #next_url = await get_next_review_page(driver)
+        print("Finished")
+        return (reviews, product_link_id, next_url)
+
+def insert_table(product_reviews, product_id, page):
+    query = """
+    INSERT INTO product_reviews (product_link_id, reviews, page) 
+    VALUES (%s, %s, %s);
+    """
+
+    # Convert product_reviews to JSONB format
+    values = (product_id, json.dumps(product_reviews), page)
+    rm.execute_query(query, values)
+
+    print(f'Inserted reviews for product_id: {product_id}, page: {page}')
+
+async def get_all_product_reviews(products):
+    async with aiohttp.ClientSession() as session:
+        # Create a list of tasks for get_product_links
+        tasks = [get_product_reviews(product[1],product[0]) for product in products]
+        # Gather results from all tasks
+        return await asyncio.gather(*tasks)
+
+'''
 async def get_product_reviews(product_link):
     async with rm.scoped_driver() as driver:
         # Initialize the WebDriver
@@ -78,13 +129,13 @@ async def get_product_reviews(product_link):
         
         # Wait for the section to be visible (adjust timeout as needed)
         section_id = "reviews"
-        slow_scroll(height)
+        await slow_scroll(height)
         section_element = WebDriverWait(driver, 20).until(
             EC.visibility_of_element_located((By.ID, section_id))
         )
         height = section_element.location['y']
         time.sleep(2)
-        await extract_xhr_url()
+        await extract_xhr_url() #get first page
 
         pg_count = 1
         while await click_next_review_page() and pg_count < 2:
@@ -101,7 +152,7 @@ async def get_product_reviews(product_link):
                         soup = BeautifulSoup(await response.text(), "html.parser")
                         reviews.append(soup.prettify()) 
         return reviews
-
+'''
 # Define a function to gradually scroll through the entire page
 async def slow_scroll(driver, start_position):
     scroll_height = driver.execute_script('return document.body.scrollHeight')
@@ -112,21 +163,20 @@ async def slow_scroll(driver, start_position):
         time.sleep(0.2)  # Adjust sleep time to control scrolling speed
 
 # Function to click the "Next" link
-async def click_next_review_page(driver):
+async def get_next_review_page(driver):
     try:
-        next_page_link = WebDriverWait(driver, 20).until(
+        loop = asyncio.get_event_loop()
+        next_page_link = await loop.run_in_executor(None, lambda: WebDriverWait(driver, 20).until(
             EC.element_to_be_clickable((By.CLASS_NAME, 'pr-rd-pagination-btn--next'))
-        )
-        try:
-            next_page_link.click()
-        except ElementClickInterceptedException:
-            driver.execute_script("arguments[0].click();", next_page_link)
-        return True
+        ))
+        next_href = next_page_link.get_attribute('href')
+        return next_href
     except NoSuchElementException:
-        return False
+        return None
 
 # Function to extract the XHR URL
-async def extract_xhr_url(driver, xhr_links):
+async def extract_xhr_url(driver):
+    xhr_links = []
     for request in driver.requests: 
         xhr_links.append(request.url)
     return xhr_links
@@ -142,11 +192,28 @@ for row in results_as_list:
     print(url, id)
     break
 
-for _ in range(5): 
-    for row in results_as_list: 
-        url = row[1]
-        id = row[0]
-        reviews = asyncio.run(get_product_reviews())
-        #some sort of array to equal the 
-        #get the first reviews json and insert
+product_list = results_as_list
+product_map = {row[0]:row[1] for row in product_list}
+
+def make_product_list(old_product_list, page):
+    new_product_list = []
+    for row in old_product_list:
+        new_url = product_map[row[0]] + f'&pr_rd_page={page+1}'
+        new_product_list.append([row[0],  new_url])
+    return new_product_list
+
+for page in range(1,20):
+    reviews = asyncio.run(get_all_product_reviews(product_list))
+    new_product_list = []
+    for product_review, product_id, next_url in reviews:
+        if product_review is None: continue
+        insert_table(product_review, product_id, page)
+    product_list = make_product_list(product_list, page)
+#for _ in range(5): 
+#    for row in results_as_list: 
+#        url = row[1]
+#        id = row[0]
+#        reviews = asyncio.run(get_all_product_reviews())
+#        #some sort of array to equal the 
+#        #get the first reviews json and insert
 

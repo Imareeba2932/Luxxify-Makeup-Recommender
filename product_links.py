@@ -76,14 +76,24 @@ async def get_category(link):
 
             # Gather results from all tasks
             product_links_from_categories = await asyncio.gather(*tasks)
+            print("got all links")
+            for category, p in product_links_from_categories:
+                print(category, len(p))
+                for product_link in p:
+                    product_links.append((category, product_link))
 
-            for product_link in product_links_from_categories:
-                product_links.extend(product_link)
-                
-                
-    for link in product_links:
-        insert_table(link)
+    for category, product_link in tqdm(product_links):
+        update_category(product_link, category)
+        #insert_table(link)
             #return product_links
+
+
+def update_category(product_link, category):
+    #print("update start")
+    query = "UPDATE product_links SET category = %s WHERE product_link = %s AND (category IS NULL OR category = '')"
+    values = (category, product_link)
+    rm.execute_query(query, values)
+    #print(f'Updated link: {product_link} with category: {category}')
 
 def insert_table(product_link):
     query = "INSERT INTO product_links (product_link) VALUES (%s)"
@@ -135,7 +145,7 @@ async def get_product_links(category_soup):
             try: 
                 pages += 1
                 driver.get(next_page)
-                all_content.extend(extract_links(driver))
+                all_content.extend(extract_links(driver)) 
                 next_page = click_next_page(driver)
                 #print('next_page',next_page,flush=True)
                 if pages % 10 == 0: 
@@ -149,7 +159,7 @@ async def get_product_links(category_soup):
                 time.sleep(5)
                 continue
  
-    return all_content
+    return (category_name, all_content)
 
 url = 'https://www.ulta.com/shop/makeup/face'
 asyncio.run(get_category(url))
