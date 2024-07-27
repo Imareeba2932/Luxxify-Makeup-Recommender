@@ -114,18 +114,19 @@ async def get_spec_prod_details(product_link):
             product_details['name'] = product_name
             print(product_details)
 
-#url = 'https://www.ulta.com/p/24-hour-power-double-wear-foundation-kit-pimprod2041706?sku=2614480'
-#asyncio.run( get_spec_prod_details(url) )
-#asyncio.run( get_product_details(url) )
+url = 'https://www.ulta.com/p/cc-cream-with-spf-50-xlsImpprod5770257?sku=2264064'
+asyncio.run( get_spec_prod_details(url) )
+asyncio.run( get_product_details(url) )
 
 # Store results in a variable
+'''
 results = get_product_links()
 results_as_list = [list(row) for row in results]
 
 # Convert to a list of lists if needed
-for result in results_as_list: 
-    url = result[-1]
+for i in range(10): 
+    url = results_as_list[i][-1]
     asyncio.run( get_spec_prod_details(url) )
     asyncio.run( get_product_details(url) )
-    break
-
+'''
+ 
