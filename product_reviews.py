@@ -78,16 +78,12 @@ async def get_product_reviews(product_link, product_link_id):
             return (None, product_link_id, next_url)
         print("Starting")
         # Wait for the section to be visible (adjust timeout as needed)
-        section_id = "reviews"
-        loop = asyncio.get_event_loop()
-        section_element = await loop.run_in_executor(None, lambda: WebDriverWait(driver, 20).until(
-            EC.visibility_of_element_located((By.ID, section_id))
-        ))
-        height = section_element.location['y']
-        await slow_scroll(driver, height)
+        found_reviews = await slow_scroll(driver)
+        if not found_reviews:
+             return (None, product_link_id, next_url)
         time.sleep(2)
         xhr_links = await extract_xhr_url(driver) #get first page
-        print("XHR")
+        print("XHR", len(xhr_links))
         #Adding Reviews to Product JSON
         for x in xhr_links:
             if 'display.powerreviews.com' in x:
@@ -154,13 +150,35 @@ async def get_product_reviews(product_link):
         return reviews
 '''
 # Define a function to gradually scroll through the entire page
-async def slow_scroll(driver, start_position):
-    scroll_height = driver.execute_script('return document.body.scrollHeight')
-    current_position = start_position
-    while current_position < scroll_height:
+async def slow_scroll(driver):
+    #scroll_height = driver.execute_script('return document.body.scrollHeight')
+    current_position = 0
+    found_reviews = False
+    i = 0
+    height = -1
+    while not found_reviews and i < 100:
         driver.execute_script('window.scrollTo(0, {});'.format(current_position))
         current_position += 100  # Adjust scrolling speed by changing increment
-        time.sleep(0.2)  # Adjust sleep time to control scrolling speed
+        i += 1
+        try:
+            section_id = "reviews"
+            loop = asyncio.get_event_loop()
+            section_element = await loop.run_in_executor(None, lambda: WebDriverWait(driver, 0.2).until(
+                EC.visibility_of_element_located((By.ID, section_id))
+            ))
+            height = section_element.location['y']
+        except Exception as e:
+            continue
+        found_reviews = True
+    if found_reviews:
+        scroll_height = driver.execute_script('return document.body.scrollHeight')
+        current_position = height
+        while current_position < scroll_height:
+            driver.execute_script('window.scrollTo(0, {});'.format(current_position))
+            current_position += 100  # Adjust scrolling speed by changing increment
+            time.sleep(0.2)  # Adjust sleep time to control scrolling speed
+    return found_reviews
+    
 
 # Function to click the "Next" link
 async def get_next_review_page(driver):
@@ -192,8 +210,8 @@ for row in results_as_list:
     print(url, id)
     break
 
-product_list = results_as_list
-product_map = {row[0]:row[1] for row in product_list}
+full_product_list = results_as_list
+product_map = {row[0]:row[1] for row in full_product_list}
 
 def make_product_list(old_product_list, page):
     new_product_list = []
@@ -202,13 +220,22 @@ def make_product_list(old_product_list, page):
         new_product_list.append([row[0],  new_url])
     return new_product_list
 
-for page in range(1,20):
-    reviews = asyncio.run(get_all_product_reviews(product_list))
-    new_product_list = []
-    for product_review, product_id, next_url in reviews:
-        if product_review is None: continue
-        insert_table(product_review, product_id, page)
-    product_list = make_product_list(product_list, page)
+def chonk_list(lst, chonk_size=8):
+    chonks = []
+    for i in range(0, len(lst), chonk_size):
+        chonks.append(lst[i:i + chonk_size])
+    return chonks
+
+# Example usage
+#my_list = list(range(20))  # Sample list with 20 elements
+for product_list in tqdm(chonk_list(full_product_list)[2:]):
+    for page in range(1,6):
+        reviews = asyncio.run(get_all_product_reviews(product_list))
+        new_product_list = []
+        for product_review, product_id, next_url in reviews:
+            if product_review is None: continue
+            insert_table(product_review, product_id, page)
+        product_list = make_product_list(product_list, page)
 #for _ in range(5): 
 #    for row in results_as_list: 
 #        url = row[1]
