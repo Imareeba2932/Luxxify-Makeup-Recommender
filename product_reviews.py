@@ -114,41 +114,6 @@ async def get_all_product_reviews(products):
         # Gather results from all tasks
         return await asyncio.gather(*tasks)
 
-'''
-async def get_product_reviews(product_link):
-    async with rm.scoped_driver() as driver:
-        # Initialize the WebDriver
-        driver.get(product_link)
-        reviews = {}
-        xhr_links = [] #stores the specific xhr links needed
-        reviews = []
-        
-        # Wait for the section to be visible (adjust timeout as needed)
-        section_id = "reviews"
-        await slow_scroll(height)
-        section_element = WebDriverWait(driver, 20).until(
-            EC.visibility_of_element_located((By.ID, section_id))
-        )
-        height = section_element.location['y']
-        time.sleep(2)
-        await extract_xhr_url() #get first page
-
-        pg_count = 1
-        while await click_next_review_page() and pg_count < 2:
-            pg_count += 1
-            time.sleep(2)  # Wait for new content to load
-            await slow_scroll(height)
-            await extract_xhr_url(driver, xhr_links)       
-        
-        #Adding Reviews to Product JSON
-        for x in xhr_links:
-            if 'display.powerreviews.com' in x:
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(x) as response:
-                        soup = BeautifulSoup(await response.text(), "html.parser")
-                        reviews.append(soup.prettify()) 
-        return reviews
-'''
 # Define a function to gradually scroll through the entire page
 async def slow_scroll(driver):
     #scroll_height = driver.execute_script('return document.body.scrollHeight')
@@ -157,7 +122,10 @@ async def slow_scroll(driver):
     i = 0
     height = -1
     while not found_reviews and i < 100:
-        driver.execute_script('window.scrollTo(0, {});'.format(current_position))
+        try:
+            driver.execute_script('window.scrollTo(0, {});'.format(current_position))
+        except Exception:
+            return found_reviews
         current_position += 100  # Adjust scrolling speed by changing increment
         i += 1
         try:
@@ -171,12 +139,15 @@ async def slow_scroll(driver):
             continue
         found_reviews = True
     if found_reviews:
-        scroll_height = driver.execute_script('return document.body.scrollHeight')
-        current_position = height
-        while current_position < scroll_height:
-            driver.execute_script('window.scrollTo(0, {});'.format(current_position))
-            current_position += 100  # Adjust scrolling speed by changing increment
-            time.sleep(0.2)  # Adjust sleep time to control scrolling speed
+        try:
+            scroll_height = driver.execute_script('return document.body.scrollHeight')        
+            current_position = height
+            while current_position < scroll_height:
+                driver.execute_script('window.scrollTo(0, {});'.format(current_position))
+                current_position += 100  # Adjust scrolling speed by changing increment
+                time.sleep(0.2)  # Adjust sleep time to control scrolling speed
+        except Exception:
+            return found_reviews
     return found_reviews
     
 
@@ -226,10 +197,25 @@ def chonk_list(lst, chonk_size=8):
         chonks.append(lst[i:i + chonk_size])
     return chonks
 
+def skip_table(page, product_list):
+    query = """
+    SELECT COUNT(*) FROM product_reviews
+    WHERE page = %s and product_link_id in %s 
+    """
+    product_ids = tuple([row[0] for row in product_list])
+    # Convert product_reviews to JSONB format
+    values = (page, product_ids)
+    res = rm.execute_query(query, values)
+    return res[0][0] > 0
+
+
+
 # Example usage
 #my_list = list(range(20))  # Sample list with 20 elements
-for product_list in tqdm(chonk_list(full_product_list)[2:]):
+for batch, product_list in enumerate(tqdm(chonk_list(full_product_list))):
     for page in range(1,6):
+        if (skip_table(page, product_list)): continue
+        print("Page ", page, " batch ", batch)
         reviews = asyncio.run(get_all_product_reviews(product_list))
         new_product_list = []
         for product_review, product_id, next_url in reviews:

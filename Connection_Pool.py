@@ -158,10 +158,16 @@ class ResourceManager:
 
         
     def execute_query(self, query, *values):
+        res = None
         with self.get_connection() as conn:  # Get a connection from the pool
             with conn.cursor() as cursor:  # Create a cursor
                 cursor.execute(query, *values)  # Execute the query
+                if cursor.description:  # Check if the query returns rows
+                    res = cursor.fetchall()
+                else:
+                    res = None 
                 conn.commit()  # Commit if needed
+        return res
 
 
     async def get_driver(self):
