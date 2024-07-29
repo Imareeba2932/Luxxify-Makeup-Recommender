@@ -34,7 +34,7 @@ import asyncio
 
 from Connection_Pool import ResourceManager
 
-MAX_CONCURRENT_REQUESTS = 8
+MAX_CONCURRENT_REQUESTS = 4
 #semaphore = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
 
 # Determine number of CPUs
@@ -77,12 +77,13 @@ async def get_product_reviews(product_link, product_link_id):
             print(e)
             return (None, product_link_id, next_url)
         print("Starting")
+        starting_xhr = len(driver.requests)
         # Wait for the section to be visible (adjust timeout as needed)
         found_reviews = await slow_scroll(driver)
         if not found_reviews:
              return (None, product_link_id, next_url)
         time.sleep(2)
-        xhr_links = await extract_xhr_url(driver) #get first page
+        xhr_links = await extract_xhr_url(driver, starting_xhr) #get first page
         print("XHR", len(xhr_links))
         #Adding Reviews to Product JSON
         for x in xhr_links:
@@ -125,6 +126,7 @@ async def slow_scroll(driver):
         try:
             driver.execute_script('window.scrollTo(0, {});'.format(current_position))
         except Exception:
+            #rm = ResourceManager(max_threads=MAX_CONCURRENT_REQUESTS)
             return found_reviews
         current_position += 100  # Adjust scrolling speed by changing increment
         i += 1
@@ -148,6 +150,8 @@ async def slow_scroll(driver):
                 time.sleep(0.2)  # Adjust sleep time to control scrolling speed
         except Exception:
             return found_reviews
+            #rm = ResourceManager(max_threads=MAX_CONCURRENT_REQUESTS)
+            #rm = ResourceManager(max_threads=MAX_CONCURRENT_REQUESTS)
     return found_reviews
     
 
@@ -164,9 +168,10 @@ async def get_next_review_page(driver):
         return None
 
 # Function to extract the XHR URL
-async def extract_xhr_url(driver):
+async def extract_xhr_url(driver, starting_xhr):
     xhr_links = []
-    for request in driver.requests: 
+    for i, request in enumerate(driver.requests):
+        if i < starting_xhr: continue
         xhr_links.append(request.url)
     return xhr_links
 
@@ -191,7 +196,7 @@ def make_product_list(old_product_list, page):
         new_product_list.append([row[0],  new_url])
     return new_product_list
 
-def chonk_list(lst, chonk_size=8):
+def chonk_list(lst, chonk_size=MAX_CONCURRENT_REQUESTS):
     chonks = []
     for i in range(0, len(lst), chonk_size):
         chonks.append(lst[i:i + chonk_size])
@@ -199,14 +204,20 @@ def chonk_list(lst, chonk_size=8):
 
 def skip_table(page, product_list):
     query = """
-    SELECT COUNT(*) FROM product_reviews
+    SELECT product_link_id FROM product_reviews
     WHERE page = %s and product_link_id in %s 
     """
     product_ids = tuple([row[0] for row in product_list])
     # Convert product_reviews to JSONB format
     values = (page, product_ids)
-    res = rm.execute_query(query, values)
-    return res[0][0] > 0
+    existing_ids = rm.execute_query(query, values)
+    existing_ids = [row[0] for row in existing_ids] 
+    existing_ids_set = set(existing_ids)
+    
+    # Filter out products that are in existing_ids
+    filtered_product_list = [row for row in product_list if row[0] not in existing_ids_set]
+    
+    return filtered_product_list
 
 
 
@@ -214,8 +225,10 @@ def skip_table(page, product_list):
 #my_list = list(range(20))  # Sample list with 20 elements
 for batch, product_list in enumerate(tqdm(chonk_list(full_product_list))):
     for page in range(1,6):
-        if (skip_table(page, product_list)): continue
-        print("Page ", page, " batch ", batch)
+        if len(product_list) == 0: continue
+        product_list = skip_table(page, product_list)
+        if len(product_list) == 0: continue
+        print("Page ", page, " batch ", batch, " batch size", len(product_list))
         reviews = asyncio.run(get_all_product_reviews(product_list))
         new_product_list = []
         for product_review, product_id, next_url in reviews:

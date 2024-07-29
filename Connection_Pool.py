@@ -204,7 +204,25 @@ class ResourceManager:
             yield driver
         finally:
             self.release_driver(driver)
-        
+
+    async def restart_driver(self, old_driver):
+        # Quit the old driver
+        old_driver.quit()
+        del old_driver
+        # Create a new driver and add it to the queue
+        options = Options()
+        options.binary_location = chrome_path
+        options.add_argument('--headless')
+        options.add_argument('--disable-gpu')
+        options.add_argument('--no-sandbox')
+        options.add_argument('--disable-dev-shm-usage')
+        options.add_argument("--disable-extensions")
+
+        service = Service(executable_path=chromedriver_path)
+        new_driver = webdriver.Chrome(service=service, options=options)
+        new_driver.maximize_window()
+        await self.release_driver(new_driver)
+
     @asynccontextmanager
     async def async_scoped_driver(self):
         driver = await self.get_driver()
