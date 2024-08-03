@@ -46,7 +46,9 @@ roll AS (
     --json_array_elements(roll_up -> 'media') AS media,
     product_link_id , 
     roll_up -> 'properties' as properties,
-    roll_up -> 'media' as media
+    roll_up -> 'media' as media,
+    roll_up -> 'faceoff_positive' -> 'comments'  as faceoff_positive, 
+    roll_up -> 'faceoff_negative' -> 'comments'  as faceoff_negative
 
     FROM sub_result
 ), reviews_hist as (
@@ -94,7 +96,9 @@ recommended_ratio,
 native_review_count,
 native_sampling_review_count,
 native_community_content_review_count,
-syndicated_review_count
+syndicated_review_count,
+faceoff_negative,
+faceoff_positive
 FROM  roll limit 5;
 
 
