@@ -71,8 +71,11 @@ roll AS (
         (SELECT product_link_id, json_array_elements(properties)->'name' as property_name, json_array_elements(json_array_elements(properties)-> 'display_values')::text AS elem FROM roll) as t
         GROUP BY 1,2
 )
-
-SELECT
+SELECT 
+(SELECT property_text from prop where roll.product_link_id = prop.product_link_id AND property_name like '%Pros%') AS pros,
+(SELECT property_text from prop where roll.product_link_id = prop.product_link_id AND property_name like '%Cons%') AS cons,
+(SELECT property_text from prop where roll.product_link_id = prop.product_link_id AND property_name like '%Best Uses%') AS best_uses,
+(SELECT  property_text from prop where roll.product_link_id = prop.product_link_id AND property_name like '%Describe Yourself%') AS describe_yourself,
 (SELECT elem from reviews_hist where roll.product_link_id = reviews_hist.product_link_id AND elem_index = 1) as review_star_1,
 (SELECT elem from reviews_hist where roll.product_link_id = reviews_hist.product_link_id AND elem_index = 2) as review_star_2,
 (SELECT elem from reviews_hist where roll.product_link_id = reviews_hist.product_link_id AND elem_index = 3) as review_star_3,
@@ -82,6 +85,7 @@ SELECT
 (SELECT elem from rating_hist where roll.product_link_id = rating_hist.product_link_id AND elem_index = 2) as rating_star_2,
 (SELECT elem from rating_hist where roll.product_link_id = rating_hist.product_link_id AND elem_index = 3) as rating_star_3,
 (SELECT elem from rating_hist where roll.product_link_id = rating_hist.product_link_id AND elem_index = 4) as rating_star_4,
+(SELECT elem from rating_hist where roll.product_link_id = rating_hist.product_link_id AND elem_index = 5) as rating_star_5,
 (SELECT elem from rating_hist where roll.product_link_id = rating_hist.product_link_id AND elem_index = 5) as rating_star_5,
 rating_count,
 review_count,
