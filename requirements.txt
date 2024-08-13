@@ -9,7 +9,6 @@ appdirs==1.4.4
 archspec==0.2.3
 argon2-cffi==21.3.0
 argon2-cffi-bindings==21.2.0
-arrow-cpp==17.0.0
 asttokens==2.0.5
 async-lru==2.0.4
 async-timeout==4.0.3
