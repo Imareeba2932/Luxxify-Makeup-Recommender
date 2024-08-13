@@ -43,7 +43,6 @@ emoji==1.7.0
 executing==0.8.3
 filelock==3.13.1
 fonttools==4.51.0
-freetype==2.12.1
 frozendict==2.4.2
 frozenlist==1.4.0
 ftfy==6.2.3
