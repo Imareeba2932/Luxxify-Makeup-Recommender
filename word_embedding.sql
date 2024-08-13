@@ -59,9 +59,9 @@ BEGIN
     -- Compute the similarity score
     BEGIN
         -- Preprocess the text and phrase
-        preprocessed_text_column := nlp_preprocess(text_column);
-        preprocessed_phrase := nlp_preprocess(phrase);
-        similarity_score := similarity_impl(preprocessed_text_column, preprocessed_phrase);
+        --preprocessed_text_column := nlp_preprocess(text_column);
+        --preprocessed_phrase := nlp_preprocess(phrase);
+        similarity_score := similarity_impl(text_column, phrase);
     EXCEPTION
         WHEN others THEN
             -- Return 0 in case of an exception
