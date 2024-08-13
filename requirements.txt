@@ -76,7 +76,6 @@ jsonschema==4.19.2
 jsonschema-specifications==2023.7.1
 kaitaistruct==0.10
 kiwisolver==1.4.4
-krb5==1.20.1
 langcodes==3.4.0
 language-data==1.2.0
 lcms2==2.12
