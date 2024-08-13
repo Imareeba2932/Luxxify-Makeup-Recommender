@@ -270,7 +270,7 @@ webencodings==0.5.1
 websockets==11.0.1
 wget==3.2
 whichcraft==0.6.1
-widgetsnbextension==4.0.0
+widgetsnbextension>=4.0.10
 wrapt==1.14.1
 xgboost==2.1.1
 xlrd==2.0.1
