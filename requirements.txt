@@ -132,7 +132,6 @@ pyodbc==4.0.34
 pyopenssl==24.1.0
 pyparsing==3.1.1
 pyrsistent==0.19.3
-pytables==3.7.0
 pytest==7.4.2
 pytest-cov==4.0.0
 pytest-mock==3.14.0
