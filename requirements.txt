@@ -33,7 +33,6 @@ comm==0.2.1
 cryptography==42.0.8
 cycler==0.11.0
 cymem==2.0.8
-dbus==1.13.18
 debugpy==1.6.7
 decorator==5.1.1
 defusedxml==0.7.1
