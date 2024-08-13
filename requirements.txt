@@ -78,7 +78,6 @@ kaitaistruct==0.10
 kiwisolver==1.4.4
 langcodes==3.4.0
 language-data==1.2.0
-libarchive==3.6.2
 libblas==3.9.0
 libboost==1.82.0
 libbrotlicommon==1.0.9
