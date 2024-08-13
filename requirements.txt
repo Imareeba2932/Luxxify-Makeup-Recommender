@@ -89,8 +89,6 @@ mistune==2.0.4
 msgpack==1.0.8
 msgpack-numpy==0.4.8
 multidict==6.0.4
-murmurhash==1.0.10
-mysql==5.7.24
 nbclient==0.8.0
 nbconvert==7.10.0
 nbformat==5.9.2
