@@ -134,40 +134,10 @@ user_profile = {
     'wrinkles_review': 1 if user_conditions.get('Wrinkles', True) else 0,
 }
 
-# Function to download model from Google Drive
-def download_model(file_id, output_filename):
-    url = f'https://drive.google.com/uc?id={file_id}'
-    gdown.download(url, output_filename, quiet=False)
-
-# Function to download CSV file from GitHub
-def download_csv(url, output_filename):
-    response = requests.get(url)
-    with open(output_filename, 'wb') as file:
-        file.write(response.content)
-
-# URLs to your CSV files on GitHub
-csv_urls = {
-    'cleaned_makeup_products.csv': 'https://raw.githubusercontent.com/zara-sarkar/Makeup_Recommender/main/cleaned_makeup_products.csv',
-    'reddit_product_embeddings.csv': 'https://raw.githubusercontent.com/zara-sarkar/Makeup_Recommender/main/reddit_product_embeddings.csv'
-}
-
-# Download and load CSV files
-for file_name, url in csv_urls.items():
-    if not os.path.isfile(file_name):
-        download_csv(url, file_name)
-
-
-# Google Drive file ID and desired output filename
-file_id = '1KVRzIc1IwdlWY7qAAobM17-msWRc2U_b'
-output_filename = 'random_forest_model.pkl'
-
-# Check if the model file already exists
-if not os.path.isfile(output_filename):
-    download_model(file_id, output_filename)
 
 
 # Load your pretrained Random Forest model
-with open(output_filename, 'rb') as file:
+with open('random_forest_model.pkl', 'rb') as file:
     model = pickle.load(file)
 
 # Load product data
