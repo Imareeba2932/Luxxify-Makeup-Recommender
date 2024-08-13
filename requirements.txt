@@ -92,7 +92,6 @@ multidict==6.0.4
 nbclient==0.8.0
 nbconvert==7.10.0
 nbformat==5.9.2
-ncurses==6.4
 nest-asyncio==1.6.0
 nltk==3.8.1
 notebook==7.2.1
