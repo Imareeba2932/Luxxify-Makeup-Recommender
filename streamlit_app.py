@@ -7,7 +7,7 @@ import gdown
 import os
 import requests
 
-#git add tan_skin.jpg, dark_skin.jpg, wrinkles.jpg, dark_circles.jpg, redness.jpg, acne.jpg, fair_skin.jpg, hyperpigmentation.jpg, sensitive.jpg
+#git add tan_skin.jpg dark_skin.jpg wrinkles.jpg dark_circles.jpg redness.jpg acne.jpg fair_skin.jpg hyperpigmentation.jpg sensitive.jpg
 
 # Streamlit app
 st.title('Makeup Recommendations')
