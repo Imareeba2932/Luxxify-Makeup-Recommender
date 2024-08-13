@@ -50,7 +50,7 @@ gdown==5.2.0
 gensim==4.3.2
 gitdb==4.0.7
 gitpython==3.1.43
-glog==0.5.0
+glog==0.3.1
 h11==0.14.0
 h2==4.1.0
 hpack==4.0.0
