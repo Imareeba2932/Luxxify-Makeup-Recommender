@@ -127,7 +127,6 @@ pycparser==2.22
 pydantic==2.8.2
 pydantic-core==2.20.1
 pydeck==0.8.0
-pydeps==0.2.1
 pygls==0.14.1
 pylint==2.17.5
 pymongo==4.6.1
