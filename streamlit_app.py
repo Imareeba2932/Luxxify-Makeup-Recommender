@@ -290,5 +290,5 @@ result_df = result_df[result_df['Category'].notna()]
 
 st.write('Selected Products For You:', result_df)
 
-formatted_total_price = f"${total_price:,.2f}"
-st.write(f"Total Price: {formatted_total_price}")
+#formatted_total_price = f"${total_price:,.2f}"
+#st.write(f"Total Price: {formatted_total_price}")
