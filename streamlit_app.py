@@ -134,12 +134,12 @@ user_profile = {
     'wrinkles_review': 1 if user_conditions.get('Wrinkles', True) else 0,
 }
 
-@st.experimental_singleton
+@st.cache_resource
 def load_model():
     with open('random_forest_model.pkl', 'rb') as file:
         return pickle.load(file)
 
-@st.experimental_singleton
+@st.cache_data
 def load_data():
     product_data = pd.read_csv('reddit_product_embeddings.csv')
     product_info = pd.read_csv('cleaned_makeup_products.csv')
