@@ -276,7 +276,6 @@ if status == pywraplp.Solver.OPTIMAL:
             total_price += row['price']
             selected_products.append({
                 'Category': row['category_name'],
-                'Product ID': row['product_link_id'],
                 'Product Name': row['product_name'],
                 'Price': formatted_price
             })
