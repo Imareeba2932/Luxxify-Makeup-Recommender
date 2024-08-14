@@ -134,21 +134,29 @@ user_profile = {
     'wrinkles_review': 1 if user_conditions.get('Wrinkles', True) else 0,
 }
 
+@st.cache
+def load_model():
+    with open('random_forest_model.pkl', 'rb') as file:
+        return pickle.load(file)
+
+@st.cache
+def load_data():
+    product_data = pd.read_csv('reddit_product_embeddings.csv')
+    product_info = pd.read_csv('cleaned_makeup_products.csv')
+    return product_data, product_info
 
 
 # Load your pretrained Random Forest model
-with open('random_forest_model.pkl', 'rb') as file:
-    model = pickle.load(file)
+model = load_model()
 
 # Load product data
-product_data = pd.read_csv('reddit_product_embeddings.csv')
+product_data,  product_info = load_data()
 product_copy = product_data.copy()
 product_copy = product_copy.drop(columns=['product_link_id', 'overall_product_rating'])
 le = LabelEncoder()
 product_copy['category'] = le.fit_transform(product_copy['category'])
 
 # Load additional product info
-product_info = pd.read_csv('cleaned_makeup_products.csv')
 product_info = product_info[['product_link_id', 'product_name', 'brand', 'price', 'category']]
 product_info.rename(columns={'category': 'category_name'}, inplace=True)
 
