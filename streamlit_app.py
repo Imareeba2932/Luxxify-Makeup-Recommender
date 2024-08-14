@@ -20,7 +20,7 @@ age_range = st.selectbox(
 )
 skin_type = st.selectbox(
     'Select Skin Type', 
-    ['Oily', 'Normal', 'Combination']
+    ['Oily', 'Dry', 'Combination']
 )
 experience_level = st.selectbox(
     'Select Makeup Experience Level', 
