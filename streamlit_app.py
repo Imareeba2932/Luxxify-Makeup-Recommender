@@ -126,7 +126,7 @@ user_profile = {
     'tan_review': 1 if selected_skin_tone == 'Medium' else 0, 
     'acne_review': 1 if user_conditions.get('Acne', True) or skin_type == 'Oily' else 0.5 if skin_type == 'Combination' else 0,
     'black_review': 1 if selected_skin_tone == 'Deep' else 0, 
-    'comfortable_wear_review': 1 if 'Working Professional' in lifestyle_options or active_options in ['2 - Moderately Busy/Active', '3 - Super Busy/Active']  else 0, 
+    'comfortable_wear_review': 1 if 'Working Professional' in lifestyle_options or active_options == '3 - Super Busy/Active'else 0.5 if active_options ==  '2 - Moderately Busy/Active'   else 0, 
     'coverage_review': 0 if coverage in ['Medium', 'Full'] else 1, 
     'medium_coverage_review': 1 if coverage == 'Medium' else 0, 
     'full_coverage_review': 1 if coverage == 'Full' else 0, 
