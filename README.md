@@ -1,6 +1,8 @@
-# Makeup_Recommender
+# Realtime Makeup Recommender
 This project aims to recommend a user specific makeup products given their skin type and concerns. 
 It was divided into three stages: webscraping, model development, and web development. 
+
+Link to site: https://luxxify.streamlit.app/
 
 ## Webscraping
 The makeup data was scraped from Ulta as it is a reputable site with makeup products at various pricepoints. To perform the webscraping, I first used BeautifulSoup to scrape the initial product data such as the name, brand, price, item ID, and the product link. Because this information is static, it was possible to make use of BeautifulSoup. This is a different story when scraping for the product reviews. 
