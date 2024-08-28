@@ -275,8 +275,10 @@ total_price = 0
 def get_first_google_result(product_name):
     try:
         query = product_name
-        for url in search(query, num=1, pause = 2):
-            return url
+        for url in search(query, num=3, start=0, stop=3, pause=2.0):
+            if url:
+                return url
+            else: continue
     except Exception as e:
         return "Search failed"
     
