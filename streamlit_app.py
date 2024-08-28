@@ -8,6 +8,7 @@ import os
 import requests
 from googlesearch import search
 import webbrowser
+import traceback
 
 #git add tan_skin.jpg dark_skin.jpg wrinkles.jpg dark_circles.jpg redness.jpg acne.jpg fair_skin.jpg hyperpigmentation.jpg sensitive.jpg
 
@@ -278,9 +279,8 @@ def get_first_google_result(product_name):
         for url in search(query, num=3, start=0, stop=3, pause=2.0):
             if url:
                 return url
-            else: continue
     except Exception as e:
-        return "Search failed"
+        return f"Search failed. Stack trace:\n{traceback.format_exc()}"
     
 def make_clickable(url):
     return f'<a href="{url}" target="_blank">{url}</a>'
