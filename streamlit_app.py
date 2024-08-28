@@ -279,8 +279,9 @@ def get_first_google_result(product_name):
             return url
     except Exception as e:
         return "Search failed"
+    
 def make_clickable(url):
-    return f'<a href="{url}" target="_blank">View Product</a>'
+    return f'<a href="{url}" target="_blank">{url}</a>'
 
 
 if status == pywraplp.Solver.OPTIMAL:
