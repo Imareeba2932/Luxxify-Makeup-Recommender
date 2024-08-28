@@ -298,7 +298,7 @@ if status == pywraplp.Solver.OPTIMAL:
                 'Category': row['category_name'],
                 'Product Name': row['product_name'],
                 'Price': formatted_price, 
-                'URL': clickable
+                'URL': first_result_link
             })
 
 else:
@@ -309,12 +309,14 @@ else:
 result_df = pd.DataFrame(selected_products)
 result_df = result_df[result_df['Category'].notna()]
 
-#st.write('Your Selected Products')
-#st.write(result_df)
+st.write('Your Selected Products')
+st.write(result_df)
 
 # Display each product with a clickable link and image in Streamlit
+'''
 if not result_df.empty:
     st.write(result_df.to_html(escape=False, index=False), unsafe_allow_html=True)
+'''
 
 
 #formatted_total_price = f"${total_price:,.2f}"
