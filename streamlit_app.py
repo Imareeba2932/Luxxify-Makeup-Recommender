@@ -6,6 +6,8 @@ from ortools.linear_solver import pywraplp
 import gdown
 import os
 import requests
+from googlesearch import search
+import webbrowser
 
 #git add tan_skin.jpg dark_skin.jpg wrinkles.jpg dark_circles.jpg redness.jpg acne.jpg fair_skin.jpg hyperpigmentation.jpg sensitive.jpg
 
@@ -268,26 +270,51 @@ status = solver.Solve()
 # Display results
 selected_products = {}
 total_price = 0
+
+@st.cache_data
+def get_first_google_result(product_name):
+    try:
+        query = product_name
+        for url in search(query, num=1):
+            return url
+    except Exception as e:
+        return "Search failed"
+def make_clickable(url):
+    return f'<a href="{url}" target="_blank">View Product</a>'
+
+
 if status == pywraplp.Solver.OPTIMAL:
     selected_products = []
     for i, row in product_budget.iterrows():
         if product_vars[i].solution_value() == 1:
             formatted_price = f"${float(row['price']):,.2f}"
-            total_price += row['price']
+            name = row['product_name']
+            first_result_link = get_first_google_result(name)
+            clickable = make_clickable(first_result_link)
+            
+            
             selected_products.append({
                 'Category': row['category_name'],
                 'Product Name': row['product_name'],
-                'Price': formatted_price
+                'Price': formatted_price, 
+                'URL': clickable
             })
 
 else:
     st.write('The problem does not have an optimal solution.')
 
+
+
 result_df = pd.DataFrame(selected_products)
 result_df = result_df[result_df['Category'].notna()]
 
+#st.write('Your Selected Products')
+#st.write(result_df)
 
-st.write('Selected Products For You:', result_df)
+# Display each product with a clickable link and image in Streamlit
+if not result_df.empty:
+    st.write(result_df.to_html(escape=False, index=False), unsafe_allow_html=True)
+
 
 #formatted_total_price = f"${total_price:,.2f}"
 #st.write(f"Total Price: {formatted_total_price}")
