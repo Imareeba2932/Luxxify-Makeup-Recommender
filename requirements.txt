@@ -4,4 +4,4 @@ scikit-learn
 ortools
 gdown
 requests
-googlesearch==1.2.5
+googlesearch==3.0.0
