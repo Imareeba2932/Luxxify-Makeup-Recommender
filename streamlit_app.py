@@ -309,9 +309,6 @@ if status == pywraplp.Solver.OPTIMAL:
                 'Product Name': row['product_name'],
                 'Price': formatted_price, 
                 'Title': title, 
-                '''
-                'Image': components.html(f"""<iframe src="{link}" width="50" height="600" style="border:none;"></iframe>
-            """, height=50) if link is not None else None, '''
                 'URL': clickable
             })
 
