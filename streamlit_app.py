@@ -275,7 +275,7 @@ total_price = 0
 
 
 
-@st.cache_data
+@st.cache_resource
 def get_first_google_result(product_name):
     try:
         query = product_name
