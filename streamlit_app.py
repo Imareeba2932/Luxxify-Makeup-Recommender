@@ -160,7 +160,7 @@ le = LabelEncoder()
 product_copy['category'] = le.fit_transform(product_copy['category'])
 
 # Load additional product info
-product_info = product_info[['product_link_id', 'product_name', 'brand', 'price', 'category']]
+product_info = product_info[['product_link_id', 'product_name', 'brand', 'price', 'category', 'description']]
 product_info.rename(columns={'category': 'category_name'}, inplace=True)
 
 
@@ -287,8 +287,8 @@ def get_first_google_result(product_name):
                 return link, title, description
             else: continue
     except Exception as e:
-        return f"Search failed. Stack trace:\n{traceback.format_exc()}"
-    return None, None, None
+        print(f'Search failed. Stack trace:\n{traceback.format_exc()}')
+        return None, None, None
     
 def make_clickable(url):
     return f'<a href="{url}" target="_blank">View Product</a>'
@@ -299,7 +299,7 @@ if status == pywraplp.Solver.OPTIMAL:
     for i, row in product_budget.iterrows():
         if product_vars[i].solution_value() == 1:
             formatted_price = f"${float(row['price']):,.2f}"
-            name = row['product_name']
+            name = row['description']
             link, title, description = get_first_google_result(name)
             clickable = make_clickable(link)
             
