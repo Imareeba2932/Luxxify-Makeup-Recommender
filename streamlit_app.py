@@ -9,7 +9,7 @@ import requests
 from googlesearch import search
 import webbrowser
 import traceback
-
+import streamlit.components.v1 as components
 #git add tan_skin.jpg dark_skin.jpg wrinkles.jpg dark_circles.jpg redness.jpg acne.jpg fair_skin.jpg hyperpigmentation.jpg sensitive.jpg
 
 # Streamlit app
@@ -272,18 +272,26 @@ status = solver.Solve()
 selected_products = {}
 total_price = 0
 
+
+
+
 @st.cache_data
 def get_first_google_result(product_name):
     try:
         query = product_name
-        for url in search(query, stop=1, pause=2.0):
-            if url:
-                return url
+        for result in search(query + ' site:amazon.com OR site:ulta.com OR site:sephora.com', num_results=30, safe=None, advanced=True):
+            if result is not None:
+                link = result.url
+                title = result.title
+                description = result.description
+                return link, title, description
+            else: continue
     except Exception as e:
         return f"Search failed. Stack trace:\n{traceback.format_exc()}"
+    return None, None, None
     
 def make_clickable(url):
-    return f'<a href="{url}" target="_blank">{url}</a>'
+    return f'<a href="{url}" target="_blank">View Product</a>'
 
 
 if status == pywraplp.Solver.OPTIMAL:
@@ -292,14 +300,18 @@ if status == pywraplp.Solver.OPTIMAL:
         if product_vars[i].solution_value() == 1:
             formatted_price = f"${float(row['price']):,.2f}"
             name = row['product_name']
-            first_result_link = get_first_google_result(name)
-            clickable = make_clickable(first_result_link)
+            link, title, description = get_first_google_result(name)
+            clickable = make_clickable(link)
             
             
             selected_products.append({
                 'Category': row['category_name'],
                 'Product Name': row['product_name'],
                 'Price': formatted_price, 
+                'Title': title, 
+                '''
+                'Image': components.html(f"""<iframe src="{link}" width="50" height="600" style="border:none;"></iframe>
+            """, height=50) if link is not None else None, '''
                 'URL': clickable
             })
 
