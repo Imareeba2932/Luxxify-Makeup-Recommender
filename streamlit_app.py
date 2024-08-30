@@ -279,7 +279,7 @@ total_price = 0
 def get_first_google_result(product_name):
     try:
         query = product_name
-        for result in search(query + ' site:amazon.com OR site:ulta.com OR site:sephora.com', num_results=30, safe=None, advanced=True):
+        for result in search(f"{query}" + ' site:amazon.com OR site:ulta.com OR site:sephora.com', num_results=30, safe=None, advanced=True):
             if result is not None:
                 link = result.url
                 title = result.title
