@@ -356,7 +356,6 @@ if status == pywraplp.Solver.OPTIMAL:
                 'Category': row['category_name'],
                 'Product Name': row['product_name'],
                 'Price': formatted_price, 
-                'Title': None, 
                 'URL': clickable
             })
 
