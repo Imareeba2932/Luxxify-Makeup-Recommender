@@ -7,7 +7,7 @@ import gdown
 import os
 import requests
 from googlesearch import search
-from duckduckgo_search import DDGS
+#from duckduckgo_search import DDGS
 import webbrowser
 import traceback
 import streamlit.components.v1 as components
@@ -347,9 +347,9 @@ if status == pywraplp.Solver.OPTIMAL:
             name = row['product_name']
             info = row['description']
             url = row['product_link']
-            link, title, description = get_first_google_result(name, info)
+            #link, title, description = get_first_google_result(name, info)
             #clickable = make_clickable(url)
-            clickable = make_clickable(link)
+            clickable = make_clickable(url)
             
             
             selected_products.append({
