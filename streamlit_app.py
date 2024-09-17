@@ -7,9 +7,12 @@ import gdown
 import os
 import requests
 from googlesearch import search
+from duckduckgo_search import DDGS
 import webbrowser
 import traceback
 import streamlit.components.v1 as components
+import traceback
+import time
 #git add tan_skin.jpg dark_skin.jpg wrinkles.jpg dark_circles.jpg redness.jpg acne.jpg fair_skin.jpg hyperpigmentation.jpg sensitive.jpg
 
 # Streamlit app
@@ -160,7 +163,7 @@ le = LabelEncoder()
 product_copy['category'] = le.fit_transform(product_copy['category'])
 
 # Load additional product info
-product_info = product_info[['product_link_id', 'product_name', 'brand', 'price', 'category', 'description']]
+product_info = product_info[['product_link_id', 'product_name', 'brand', 'price', 'category', 'description', 'product_link']]
 product_info.rename(columns={'category': 'category_name'}, inplace=True)
 
 
@@ -276,19 +279,61 @@ total_price = 0
 
 
 @st.cache_resource
-def get_first_google_result(product_name):
-    try:
-        query = product_name
-        for result in search(f"{query}" + ' site:amazon.com OR site:ulta.com OR site:sephora.com', num_results=30, safe=None, pause=2.0,advanced=True):
-            if result is not None:
-                link = result.url
-                title = result.title
-                description = result.description
-                return link, title, description
-            else: continue
-    except Exception as e:
-        print(f'Search failed. Stack trace:\n{traceback.format_exc()}')
-        return None, None, None
+def get_first_google_result(product_name, info, max_retries=5, backoff_factor=2):
+    retry_count = 0
+    query = f'{product_name} {info}  site:amazon.com OR site:ulta.com OR site:sephora.com'
+
+    while retry_count < max_retries:
+        try:
+            # Assuming `search` is a function that returns a generator or iterable of results
+            result = search(query, num_results=1, safe=None, advanced=True)
+
+            for r in result:
+                if r.url and r.title and r.description:
+                    link = r.url
+                    title = r.title
+                    description = r.description
+                    print(link, title, description)
+                    return link, title, description
+            
+            break  # Exit loop if successful
+
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 429:  # Too Many Requests
+                retry_count += 1
+                wait_time = backoff_factor * (2 ** retry_count)
+                print(f"429 error: Retry {retry_count}/{max_retries} in {wait_time} seconds...")
+                time.sleep(wait_time)
+            else:
+                raise  # Re-raise exception if it's not a 429 error
+
+        except Exception as e:
+            # Handle other exceptions that might occur during the search
+            print(f"An error occurred: {e}")
+            retry_count += 1
+            wait_time = backoff_factor * (2 ** retry_count)
+            print(f"Retrying in {wait_time} seconds...")
+            time.sleep(wait_time)
+    
+    # If all retries are exhausted
+    print("Max retries exceeded. Unable to get Google result.")
+    return None, None, None
+    '''
+    time.sleep(5)
+    query = f'{product_name} {info}  site:amazon.com OR site:ulta.com OR site:sephora.com'
+    q = product_name + ' amazon.com ulta.com sephora.com'# + info 
+    result = search( query, num_results=1, safe=None,advanced=True)
+    #result = DDGS().text(query,  region='us-en', safesearch='off', timelimit='y', max_results=3)
+    for r in result:
+        if r.url and r.title and r.description:
+            link = r.url
+            title = r.title
+            description = r.description
+            print(link, title, description)
+            return link, title, description
+    return None, None, None
+    '''
+ 
     
 def make_clickable(url):
     return f'<a href="{url}" target="_blank">View Product</a>'
@@ -299,8 +344,11 @@ if status == pywraplp.Solver.OPTIMAL:
     for i, row in product_budget.iterrows():
         if product_vars[i].solution_value() == 1:
             formatted_price = f"${float(row['price']):,.2f}"
-            name = row['description']
-            link, title, description = get_first_google_result(name)
+            name = row['product_name']
+            info = row['description']
+            url = row['product_link']
+            link, title, description = get_first_google_result(name, info)
+            #clickable = make_clickable(url)
             clickable = make_clickable(link)
             
             
@@ -308,7 +356,7 @@ if status == pywraplp.Solver.OPTIMAL:
                 'Category': row['category_name'],
                 'Product Name': row['product_name'],
                 'Price': formatted_price, 
-                'Title': title, 
+                'Title': None, 
                 'URL': clickable
             })
 
