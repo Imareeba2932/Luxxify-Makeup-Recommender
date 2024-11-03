@@ -4,6 +4,8 @@
 The Luxxify Makeup Recommender generates curated product suggestions tailored to individual profiles based on skin tone, type, age, makeup coverage preference, and specific skin concerns. The recommendation engine leverages machine learning with rule-based logic, trained on a custom dataset collected through web scraping. The project is deployed on a scalable Streamlit application, showcasing strong data science and deployment capabilities.
 
 To use the Luxxify Makeup Recommender click on this link: https://luxxify.streamlit.app/
+[Kaggle Dataset](https://www.kaggle.com/datasets/zarasarkar/makeup-insights-customer-reviews/data)
+
 <img width="461" alt="image" src="https://github.com/user-attachments/assets/e476a245-0e78-4cc9-9d92-75f7e6cf595a">
 
 
