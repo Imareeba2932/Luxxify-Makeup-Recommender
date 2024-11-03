@@ -10,22 +10,22 @@ To use the Luxxify Makeup Recommender click on this link: https://luxxify.stream
 ## Technologies Used
 - **Programming Languages:** Python and PostgreSQL
 - **Python Libraries:**
-  - `[pandas](https://pandas.pydata.org/)`: Data manipulation and analysis 
-  - `[numpy](https://numpy.org/)`: Numerical computing
-  - `[gensim](https://pypi.org/project/gensim/)`: Natural language processing
-  - `[scikit-learn](https://scikit-learn.org/stable/)`: Machine learning
-  - `[matplotlib] (https://matplotlib.org/)` and `[seaborn] (https://seaborn.pydata.org/)`: Data visualization
-  - `[ortools](https://pypi.org/project/ortools/)`: Operations research and optimization for rule based logic
-  - `[psycopg2](https://pypi.org/project/psycopg2/)`: PostgreSQL database adapter for Python
-  - `[streamlit](https://streamlit.io/)`: Application hosting
-  - `[requests](https://pypi.org/project/requests/)`: Requesting URLs
-  - `[selenium](https://selenium-python.readthedocs.io/)`: Scrolling and button interactions
-  - `[beautifulsoup4](https://pypi.org/project/beautifulsoup4/)`: Accessing site text
+  - [pandas](https://pandas.pydata.org/): Data manipulation and analysis 
+  - [numpy](https://numpy.org/): Numerical computing
+  - [gensim](https://pypi.org/project/gensim/): Natural language processing
+  - [scikit-learn](https://scikit-learn.org/stable/): Machine learning
+  - [matplotlib](https://matplotlib.org/) and [seaborn](https://seaborn.pydata.org/): Data visualization
+  - [ortools](https://pypi.org/project/ortools/): Operations research and optimization for rule-based logic
+  - [psycopg2](https://pypi.org/project/psycopg2/): PostgreSQL database adapter for Python
+  - [streamlit](https://streamlit.io/): Application hosting
+  - [requests](https://pypi.org/project/requests/): Requesting URLs
+  - [selenium](https://selenium-python.readthedocs.io/): Scrolling and button interactions
+  - [beautifulsoup4](https://pypi.org/project/beautifulsoup4/): Accessing site text
   
 
 
 ## Features
-- **Personalized Recommendations:** Utilizes a [Random Forest] (https://scikit-learn.org/1.5/modules/generated/sklearn.ensemble.RandomForestClassifier.html) model to predict scores for makeup products based on user profiles.
+- **Personalized Recommendations:** Utilizes a [Random Forest](https://scikit-learn.org/1.5/modules/generated/sklearn.ensemble.RandomForestClassifier.html) model to predict scores for makeup products based on user profiles.
 - **Budget Optimization:** Implements a [linear programming solver](https://developers.google.com/optimization/mip/mip_example) to recommend products that fit within the user-defined budget while maximizing predicted satisfaction scores.
 - **Similarity Assessment:** Computes text similarity using [Word2Vec](https://radimrehurek.com/gensim/models/word2vec.html) embeddings for better understanding of product descriptions and user queries.
 - **Interactive User Input:** Processes user preferences including skin type, coverage needs, and specific concerns to generate tailored product suggestions.
