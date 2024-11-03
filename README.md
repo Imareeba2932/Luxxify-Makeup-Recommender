@@ -59,7 +59,7 @@ To use the Luxxify Makeup Recommender click on this link: https://luxxify.stream
 
 ### Deployment
 
-- ** User Experience: ** The system is designed with user experience in mind, offering an interactive interface that allows for easy input of user profiles and preferences. This design choice enhances accessibility, ensuring that individuals with varying levels of technical expertise can utilize the system effectively.
+- **User Experience:** The system is designed with user experience in mind, offering an interactive interface that allows for easy input of user profiles and preferences. This design choice enhances accessibility, ensuring that individuals with varying levels of technical expertise can utilize the system effectively.
 
 - **User Input Handling:** A comprehensive preprocessing phase for user inputs was integrated to transform raw data into a format that can be effectively processed by the model. Although the preprocessing function is currently commented out, this initial design anticipates potential enhancements to streamline user interactions and improve recommendation accuracy. Additionally, a robust error-handling mechanism ensures that the system can gracefully manage unexpected inputs or computational failures, returning a default value rather than crashing.
 
@@ -80,6 +80,8 @@ Enhanced NLP Features: Experiment with more advanced NLP models like BERT or oth
 For any inquiries, reach out via:
 
 GitHub: @zara-sarkar
+
 LinkedIn: https://www.linkedin.com/in/zsarkar/
+
 Email: sarkar.z@northeastern.edu
 
