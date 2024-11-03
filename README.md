@@ -10,24 +10,24 @@ To use the Luxxify Makeup Recommender click on this link: https://luxxify.stream
 ## Technologies Used
 - **Programming Languages:** Python and PostgreSQL
 - **Python Libraries:**
-  - `pandas`: Data manipulation and analysis
-  - `numpy`: Numerical computing
-  - `gensim`: Natural language processing
-  - `scikit-learn`: Machine learning
-  - `matplotlib` and `seaborn`: Data visualization
-  - `ortools`: Operations research and optimization for rule based logic
-  - `psycopg2`: PostgreSQL database adapter for Python
-  - `streamlit`: application hosting
-  - `requests`: requesting URLs
-  - `selenium`: scrolling and button interactions
-  - `beautifulsoup4`: accessing site text
+  - `[pandas](https://pandas.pydata.org/)`: Data manipulation and analysis 
+  - `[numpy](https://numpy.org/)`: Numerical computing
+  - `[gensim](https://pypi.org/project/gensim/)`: Natural language processing
+  - `[scikit-learn](https://scikit-learn.org/stable/)`: Machine learning
+  - `[matplotlib] (https://matplotlib.org/)` and `[seaborn] (https://seaborn.pydata.org/)`: Data visualization
+  - `[ortools](https://pypi.org/project/ortools/)`: Operations research and optimization for rule based logic
+  - `[psycopg2](https://pypi.org/project/psycopg2/)`: PostgreSQL database adapter for Python
+  - `[streamlit](https://streamlit.io/)`: Application hosting
+  - `[requests](https://pypi.org/project/requests/)`: Requesting URLs
+  - `[selenium](https://selenium-python.readthedocs.io/)`: Scrolling and button interactions
+  - `[beautifulsoup4](https://pypi.org/project/beautifulsoup4/)`: Accessing site text
   
 
 
 ## Features
-- **Personalized Recommendations:** Utilizes a Random Forest model to predict scores for makeup products based on user profiles.
-- **Budget Optimization:** Implements a linear programming solver to recommend products that fit within the user-defined budget while maximizing predicted satisfaction scores.
-- **Similarity Assessment:** Computes text similarity using Word2Vec embeddings for better understanding of product descriptions and user queries.
+- **Personalized Recommendations:** Utilizes a [Random Forest] (https://scikit-learn.org/1.5/modules/generated/sklearn.ensemble.RandomForestClassifier.html) model to predict scores for makeup products based on user profiles.
+- **Budget Optimization:** Implements a [linear programming solver](https://developers.google.com/optimization/mip/mip_example) to recommend products that fit within the user-defined budget while maximizing predicted satisfaction scores.
+- **Similarity Assessment:** Computes text similarity using [Word2Vec](https://radimrehurek.com/gensim/models/word2vec.html) embeddings for better understanding of product descriptions and user queries.
 - **Interactive User Input:** Processes user preferences including skin type, coverage needs, and specific concerns to generate tailored product suggestions.
 - **Custom Dataset Collection:** Web scraping of product and review data from various online sources, creating a dataset uniquely tailored to the beauty and skincare domain.
 - **Handcrafted Feature Engineering:** Features were selected based on insights from Natural Language Processing (NLP) and word embeddings derived from Reddit discussions on makeup.
@@ -39,9 +39,9 @@ To use the Luxxify Makeup Recommender click on this link: https://luxxify.stream
 
 ### Data Collection and Processing
 
-- **Web Scraping:** Product and review data are scraped from Ulta, which is a popular e-commerce site for cosmetics. This raw data serves as the foundation for a robust recommendation engine, with a custom scraper built using requests, Selenium, and BeautifulSoup4. Selenium was used to perform button click and scroll interactions on the Ulta site to dynamically load data. We then used requests to access specific URLs from XHR GET requests. Finally, we used BeautifulSoup4 for scraping static text data.
+- **Web Scraping:** Product and review data are scraped from [Ulta](https://www.ulta.com/), which is a popular e-commerce site for cosmetics. This raw data serves as the foundation for a robust recommendation engine, with a custom scraper built using requests, Selenium, and BeautifulSoup4. Selenium was used to perform button click and scroll interactions on the Ulta site to dynamically load data. We then used requests to access specific URLs from XHR GET requests. Finally, we used BeautifulSoup4 for scraping static text data.
  
-- **PostgreSQL Ingestion**: For data management, PostgreSQL was chosen for its scalability and efficient storage capabilities. This decision supports complex queries and enhances data integrity while providing a structured environment for storing diverse datasets, including user profiles and product data. 
+- **PostgreSQL Ingestion**: For data management, [PostgreSQL](https://www.postgresql.org/) was chosen for its scalability and efficient storage capabilities. This decision supports complex queries and enhances data integrity while providing a structured environment for storing diverse datasets, including user profiles and product data. 
 
 - **Leveraging PostgreSQL UDFs For Feature Extraction**: Python PostgreSQL UDFs were used to make feature engineering more scalable. To optimize performance, a caching mechanism was introduced, storing computed vectors for previously encountered phrases, which significantly speeds up similarity calculations for repeated queries. 
 
