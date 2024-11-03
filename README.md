@@ -78,7 +78,7 @@ Custom Created Dataset via WebScraping: [Kaggle Dataset](https://www.kaggle.com/
 Enhanced NLP Features: Experiment with more advanced NLP models like BERT or other transformers to capture deeper insights from beauty reviews.
 - **User Feedback Integration:** Allow users to rate recommendations, creating a feedback loop for continuous model improvement.
 - **Add Causal Discrete Choice Model:** Add causal discrete choice model to capture choices across the competitive landscape and causally determine why customers select certain products. Nested logit models look like a good choice to ensemble with our existing model. 
-- **Implement Computer Vision Based Features:** Extract CV based features from image and video review data. This is will allow us to extract more fine grained demographic information.  
+- **Implement Computer Vision Based Features:** Extract CV based features from image and video review data. This will allow us to extract more fine grained demographic information.  
  
 
 # Contact
