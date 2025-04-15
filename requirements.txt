@@ -1,7 +1,0 @@
-streamlit
-pandas
-scikit-learn
-ortools
-gdown
-requests
-googlesearch-python==1.2.5
